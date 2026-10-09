@@ -392,7 +392,7 @@ namespace youtube_dowload
             this.MaximizeBox = false;
             this.Name = "Form1";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "YouTube ve Video İndirici v2.0 (FFmpeg & yt-dlp)";
+            this.Text = "YouTube ve Video İndirici v2.0.1 (FFmpeg & yt-dlp)";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.Load += new System.EventHandler(this.Form1_Load);
             this.grpVideoInfo.ResumeLayout(false);

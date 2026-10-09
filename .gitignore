@@ -25,11 +25,14 @@ $RECYCLE.BIN/
 *.msp
 *.lnk
 
-# Kullanıcı ayarları
-settings.json
-YouTubeDownloader_v2.0_Windows.zip
+# Dağıtım ve paketler
+*.zip
+VideoDownloader-Setup.exe
+Output/
 Publish/
+ffmpeg_extracted/
 packages/
 src/youtube-downloader/packages/
-ffmpeg_extracted/
-ffmpeg.zip
+
+# Kullanıcı ayarları
+settings.json
