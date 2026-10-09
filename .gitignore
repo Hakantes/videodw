@@ -31,3 +31,5 @@ YouTubeDownloader_v2.0_Windows.zip
 Publish/
 packages/
 src/youtube-downloader/packages/
+ffmpeg_extracted/
+ffmpeg.zip

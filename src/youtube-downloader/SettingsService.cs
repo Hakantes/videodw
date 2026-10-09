@@ -9,6 +9,7 @@ namespace youtube_dowload
         public string DownloadFolder { get; set; } = string.Empty;
         public string LastQuality { get; set; } = "auto";
         public bool IsAudioOnly { get; set; } = false;
+        public string BrowserForCookies { get; set; } = "Yok";
     }
 
     public static class SettingsService
@@ -53,7 +54,8 @@ namespace youtube_dowload
             {
                 DownloadFolder = GetDefaultDownloadFolder(),
                 LastQuality = "auto",
-                IsAudioOnly = false
+                IsAudioOnly = false,
+                BrowserForCookies = "Yok"
             };
         }
 

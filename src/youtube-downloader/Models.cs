@@ -28,7 +28,7 @@ namespace youtube_dowload
         public string Url { get; set; }
         public string OutputDirectory { get; set; }
         public bool IsAudioOnly { get; set; }
-        public int? TargetResolution { get; set; } // null ise Best/Auto
+        public int? TargetResolution { get; set; }
         public string AudioFormat { get; set; } = "mp3";
     }
 
@@ -40,5 +40,10 @@ namespace youtube_dowload
         public string TotalBytes { get; set; } = string.Empty;
         public string DownloadedBytes { get; set; } = string.Empty;
         public string StatusMessage { get; set; } = string.Empty;
+    }
+    
+    public class BotVerificationException : Exception 
+    { 
+        public BotVerificationException(string message) : base(message) { } 
     }
 }

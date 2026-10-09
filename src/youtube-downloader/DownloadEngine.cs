@@ -16,6 +16,8 @@ namespace youtube_dowload
     {
         private string _ytDlpPath;
         private string _ffmpegPath;
+        
+        public string BrowserForCookies { get; set; }
 
         public DownloadEngine()
         {
@@ -108,50 +110,78 @@ namespace youtube_dowload
             if (!File.Exists(_ytDlpPath))
                 throw new FileNotFoundException("yt-dlp.exe bulunamadı: " + _ytDlpPath);
 
-            Logger.Log($"Video analizi başlatılıyor: {url}");
+            int maxRetries = 3;
+            int delayMs = 1500;
 
-            var psi = new ProcessStartInfo
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
-                FileName = _ytDlpPath,
-                Arguments = $"--dump-single-json --no-playlist --no-warnings \"{url.Trim()}\"",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8
-            };
+                Logger.Log($"Video analizi başlatılıyor: {url} (Deneme {attempt})");
 
-            using (var process = new Process { StartInfo = psi })
-            {
-                var stdout = new StringBuilder();
-                var stderr = new StringBuilder();
-
-                process.OutputDataReceived += (s, e) => { if (e.Data != null) stdout.AppendLine(e.Data); };
-                process.ErrorDataReceived += (s, e) => { if (e.Data != null) stderr.AppendLine(e.Data); };
-
-                process.Start();
-                process.BeginOutputReadLine();
-                process.BeginErrorReadLine();
-
-                using (cancellationToken.Register(() => KillProcess(process)))
+                string args = $"--dump-single-json --no-playlist --no-warnings ";
+                if (!string.IsNullOrWhiteSpace(BrowserForCookies) && BrowserForCookies != "Yok")
                 {
-                    await Task.Run(() => process.WaitForExit());
+                    args += $"--cookies-from-browser {BrowserForCookies.ToLower()} ";
                 }
+                args += $"\"{url.Trim()}\"";
 
-                if (cancellationToken.IsCancellationRequested)
-                    throw new OperationCanceledException("Video analizi kullanıcı tarafından iptal edildi.");
-
-                if (process.ExitCode != 0)
+                var psi = new ProcessStartInfo
                 {
+                    FileName = _ytDlpPath,
+                    Arguments = args,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
+
+                using (var process = new Process { StartInfo = psi })
+                {
+                    var stdout = new StringBuilder();
+                    var stderr = new StringBuilder();
+
+                    process.OutputDataReceived += (s, e) => { if (e.Data != null) stdout.AppendLine(e.Data); };
+                    process.ErrorDataReceived += (s, e) => { if (e.Data != null) stderr.AppendLine(e.Data); };
+
+                    process.Start();
+                    process.BeginOutputReadLine();
+                    process.BeginErrorReadLine();
+
+                    using (cancellationToken.Register(() => KillProcess(process)))
+                    {
+                        await Task.Run(() => process.WaitForExit());
+                    }
+
+                    if (cancellationToken.IsCancellationRequested)
+                        throw new OperationCanceledException("Video analizi kullanıcı tarafından iptal edildi.");
+
+                    if (process.ExitCode == 0)
+                    {
+                        string json = stdout.ToString();
+                        return ParseVideoInfoJson(json, url);
+                    }
+                    
                     string err = stderr.ToString().Trim();
                     Logger.Log($"Video analiz hatası (ExitCode {process.ExitCode}): {err}");
-                    throw new Exception(string.IsNullOrWhiteSpace(err) ? "Video bilgileri alınamadı." : err);
-                }
 
-                string json = stdout.ToString();
-                return ParseVideoInfoJson(json, url);
+                    if (err.Contains("Sign in to confirm you're not a bot") || err.Contains("bot"))
+                    {
+                        throw new BotVerificationException("YouTube bot olmadığınızı doğrulamak için oturum açmanızı istiyor. Ayarlardan tarayıcı çerezlerini aktif edip tekrar deneyin.");
+                    }
+
+                    if (attempt == maxRetries)
+                    {
+                        throw new Exception(string.IsNullOrWhiteSpace(err) ? "Video bilgileri alınamadı." : err);
+                    }
+
+                    // Bekle ve tekrar dene
+                    await Task.Delay(delayMs, cancellationToken);
+                    delayMs *= 2; // Artan bekleme süresi
+                }
             }
+            
+            throw new Exception("Bilinmeyen bir hata oluştu.");
         }
 
         private VideoMetadata ParseVideoInfoJson(string json, string url)
@@ -259,8 +289,14 @@ namespace youtube_dowload
                 }
             }
 
-            // Output template with sanitize
-            string outTemplate = Path.Combine(request.OutputDirectory, "%(title)s.%(ext)s");
+            // Browser Cookies
+            if (!string.IsNullOrWhiteSpace(BrowserForCookies) && BrowserForCookies != "Yok")
+            {
+                sbArgs.Append($"--cookies-from-browser {BrowserForCookies.ToLower()} ");
+            }
+
+            // Output template with sanitize and unique ID to prevent collisions
+            string outTemplate = Path.Combine(request.OutputDirectory, "%(title)s [%(id)s].%(ext)s");
             sbArgs.Append($"--no-overwrites -o \"{outTemplate}\" ");
 
             // Target URL
@@ -362,6 +398,12 @@ namespace youtube_dowload
                 {
                     string err = stderr.ToString().Trim();
                     Logger.Log($"İndirme hatası (ExitCode {process.ExitCode}): {err}");
+
+                    if (err.Contains("Sign in to confirm you're not a bot") || err.Contains("bot"))
+                    {
+                        throw new BotVerificationException("YouTube bot olmadığınızı doğrulamak için oturum açmanızı istiyor. Ayarlardan tarayıcı çerezlerini aktif edip tekrar deneyin.");
+                    }
+
                     throw new Exception(string.IsNullOrWhiteSpace(err) ? "İndirme sırasında bir hata oluştu." : err);
                 }
 

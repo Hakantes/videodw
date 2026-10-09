@@ -24,6 +24,8 @@ namespace youtube_dowload
             InitializeComponent();
         }
 
+        private ComboBox _cmbCookies;
+
         private void Form1_Load(object sender, EventArgs e)
         {
             try
@@ -40,6 +42,32 @@ namespace youtube_dowload
             txtFolderPath.Text = _settings.DownloadFolder;
             rbAudio.Checked = _settings.IsAudioOnly;
             rbVideo.Checked = !_settings.IsAudioOnly;
+            
+            // Programmatically add Cookies option to grpOptions
+            grpOptions.Size = new Size(grpOptions.Size.Width, grpOptions.Size.Height + 40);
+            
+            Label lblCookies = new Label();
+            lblCookies.Text = "Tarayıcı Çerezleri:";
+            lblCookies.Location = new Point(lblQualityDesc.Location.X, lblQualityDesc.Location.Y + 35);
+            lblCookies.AutoSize = true;
+            lblCookies.Font = lblQualityDesc.Font;
+            grpOptions.Controls.Add(lblCookies);
+
+            _cmbCookies = new ComboBox();
+            _cmbCookies.DropDownStyle = ComboBoxStyle.DropDownList;
+            _cmbCookies.Items.AddRange(new object[] { "Yok", "Chrome", "Edge", "Firefox", "Opera", "Brave", "Safari", "Vivaldi" });
+            _cmbCookies.SelectedItem = string.IsNullOrWhiteSpace(_settings.BrowserForCookies) ? "Yok" : _settings.BrowserForCookies;
+            _cmbCookies.Location = new Point(cmbQuality.Location.X, cmbQuality.Location.Y + 35);
+            _cmbCookies.Size = cmbQuality.Size;
+            _cmbCookies.Font = cmbQuality.Font;
+            _cmbCookies.SelectedIndexChanged += (s, ev) => 
+            { 
+                _settings.BrowserForCookies = _cmbCookies.SelectedItem.ToString(); 
+                _engine.BrowserForCookies = _settings.BrowserForCookies;
+                SettingsService.Save(_settings); 
+            };
+            grpOptions.Controls.Add(_cmbCookies);
+            _engine.BrowserForCookies = _settings.BrowserForCookies;
 
             PopulateDefaultQualityOptions();
 
@@ -132,6 +160,13 @@ namespace youtube_dowload
             {
                 lblStatus.Text = "Analiz iptal edildi.";
                 lblStatus.ForeColor = Color.Black;
+            }
+            catch (BotVerificationException ex)
+            {
+                lblStatus.Text = "YouTube Bot Koruması: Oturum açmanız gerekiyor.";
+                lblStatus.ForeColor = Color.DarkOrange;
+                Logger.Log("Bot doğrulaması hatası: " + ex.Message);
+                MessageBox.Show(ex.Message, "Doğrulama Gerekli", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             catch (Exception ex)
             {
@@ -319,6 +354,14 @@ namespace youtube_dowload
                 lblStatus.Text = "İndirme işlemi iptal edildi.";
                 lblStatus.ForeColor = Color.DarkOrange;
                 lblProgressDetails.Text = "İptal edildi.";
+            }
+            catch (BotVerificationException ex)
+            {
+                lblStatus.Text = "YouTube Bot Koruması: Oturum açmanız gerekiyor.";
+                lblStatus.ForeColor = Color.DarkOrange;
+                lblProgressDetails.Text = "Bot doğrulaması hatası.";
+                Logger.Log("İndirme bot doğrulaması hatası: " + ex.Message);
+                MessageBox.Show(ex.Message, "Doğrulama Gerekli", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             catch (Exception ex)
             {
