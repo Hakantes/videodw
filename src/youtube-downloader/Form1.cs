@@ -13,9 +13,9 @@ namespace youtube_dowload
     public partial class Form1 : Form
     {
         private readonly DownloadEngine _engine = new DownloadEngine();
-        private VideoMetadata _currentMetadata;
         private CancellationTokenSource _downloadCts;
         private CancellationTokenSource _analyzeCts;
+        private VideoMetadata _currentMetadata;
         private string _lastDownloadedFile;
         private AppSettings _settings;
 
@@ -23,8 +23,6 @@ namespace youtube_dowload
         {
             InitializeComponent();
         }
-
-        private ComboBox _cmbCookies;
 
         private void Form1_Load(object sender, EventArgs e)
         {
@@ -42,31 +40,24 @@ namespace youtube_dowload
             txtFolderPath.Text = _settings.DownloadFolder;
             rbAudio.Checked = _settings.IsAudioOnly;
             rbVideo.Checked = !_settings.IsAudioOnly;
-            
-            // Programmatically add Cookies option to grpOptions
-            grpOptions.Size = new Size(grpOptions.Size.Width, grpOptions.Size.Height + 40);
-            
-            Label lblCookies = new Label();
-            lblCookies.Text = "Tarayıcı Çerezleri:";
-            lblCookies.Location = new Point(lblQualityDesc.Location.X, lblQualityDesc.Location.Y + 35);
-            lblCookies.AutoSize = true;
-            lblCookies.Font = lblQualityDesc.Font;
-            grpOptions.Controls.Add(lblCookies);
 
-            _cmbCookies = new ComboBox();
-            _cmbCookies.DropDownStyle = ComboBoxStyle.DropDownList;
-            _cmbCookies.Items.AddRange(new object[] { "Yok", "Chrome", "Edge", "Firefox", "Opera", "Brave", "Safari", "Vivaldi" });
-            _cmbCookies.SelectedItem = string.IsNullOrWhiteSpace(_settings.BrowserForCookies) ? "Yok" : _settings.BrowserForCookies;
-            _cmbCookies.Location = new Point(cmbQuality.Location.X, cmbQuality.Location.Y + 35);
-            _cmbCookies.Size = cmbQuality.Size;
-            _cmbCookies.Font = cmbQuality.Font;
-            _cmbCookies.SelectedIndexChanged += (s, ev) => 
-            { 
-                _settings.BrowserForCookies = _cmbCookies.SelectedItem.ToString(); 
-                _engine.BrowserForCookies = _settings.BrowserForCookies;
-                SettingsService.Save(_settings); 
-            };
-            grpOptions.Controls.Add(_cmbCookies);
+            // Profil Seçimi
+            cmbProfile.Items.Clear();
+            cmbProfile.Items.Add("Windows Uyumlu MP4 (H.264)");
+            cmbProfile.Items.Add("En İyi Kalite (Orijinal Codec)");
+            cmbProfile.Items.Add("H.264'e Dönüştür (Yeniden Kodla)");
+
+            if (_settings.LastProfile == "BestQuality")
+                cmbProfile.SelectedIndex = 1;
+            else if (_settings.LastProfile == "ForceReencodeH264")
+                cmbProfile.SelectedIndex = 2;
+            else
+                cmbProfile.SelectedIndex = 0;
+
+            // Çerez Seçimi
+            cmbCookies.Items.Clear();
+            cmbCookies.Items.AddRange(new object[] { "Yok", "Chrome", "Edge", "Firefox", "Opera", "Brave", "Safari", "Vivaldi" });
+            cmbCookies.SelectedItem = string.IsNullOrWhiteSpace(_settings.BrowserForCookies) ? "Yok" : _settings.BrowserForCookies;
             _engine.BrowserForCookies = _settings.BrowserForCookies;
 
             PopulateDefaultQualityOptions();
@@ -124,16 +115,15 @@ namespace youtube_dowload
             string url = txtUrl.Text.Trim();
             if (string.IsNullOrEmpty(url))
             {
-                MessageBox.Show("Lütfen bir video bağlantısı (URL) girin.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtUrl.Focus();
+                MessageBox.Show("Lütfen geçerli bir video URL'si girin.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             SetUiState(isAnalyzing: true);
-            lblStatus.Text = "Video analiz ediliyor, lütfen bekleyin...";
-            lblStatus.ForeColor = Color.Blue;
+            lblStatus.Text = "Video bilgileri ve formatları analiz ediliyor...";
+            lblStatus.ForeColor = Color.DarkBlue;
+            lblProgressDetails.Text = "Bilgiler alınıyor...";
 
-            _analyzeCts?.Cancel();
             _analyzeCts = new CancellationTokenSource();
 
             try
@@ -141,7 +131,9 @@ namespace youtube_dowload
                 _currentMetadata = await _engine.GetVideoInfoAsync(url, _analyzeCts.Token);
 
                 lblVideoTitle.Text = _currentMetadata.Title;
-                lblVideoInfo.Text = $"Kanal: {_currentMetadata.Uploader}  |  Süre: {_currentMetadata.FormattedDuration}";
+                string vCodecs = _currentMetadata.VideoCodecs.Count > 0 ? string.Join(", ", _currentMetadata.VideoCodecs) : "Belirsiz";
+                string aCodecs = _currentMetadata.AudioCodecs.Count > 0 ? string.Join(", ", _currentMetadata.AudioCodecs) : "Belirsiz";
+                lblVideoInfo.Text = $"Kanal: {_currentMetadata.Uploader}  |  Süre: {_currentMetadata.FormattedDuration}\r\nVideo Codec: {vCodecs}  |  Ses: {aCodecs}";
 
                 // Küçük resmi yükle
                 if (!string.IsNullOrEmpty(_currentMetadata.ThumbnailUrl))
@@ -149,7 +141,7 @@ namespace youtube_dowload
                     LoadThumbnailAsync(_currentMetadata.ThumbnailUrl);
                 }
 
-                // Çözünürlükleri dinamik doldur (Yalnızca mevcut olanlar!)
+                // Çözünürlükleri profil durumuna göre doldur
                 PopulateAvailableResolutions(_currentMetadata.AvailableResolutions);
 
                 lblStatus.Text = "Analiz tamamlandı. İndirmeye hazır.";
@@ -186,11 +178,24 @@ namespace youtube_dowload
             cmbQuality.Items.Clear();
             cmbQuality.Items.Add(new QualityItem("En Yüksek Kalite (Otomatik)", null));
 
+            bool isWinProfile = cmbProfile.SelectedIndex == 0;
+
             if (availableHeights != null && availableHeights.Count > 0)
             {
                 foreach (int height in availableHeights)
                 {
                     string label = GetResolutionLabel(height);
+                    if (isWinProfile && _currentMetadata != null)
+                    {
+                        if (_currentMetadata.AvailableH264Resolutions.Contains(height))
+                        {
+                            label += " [H.264 Uyumlu]";
+                        }
+                        else
+                        {
+                            label += " [Yalnızca AV1/VP9]";
+                        }
+                    }
                     cmbQuality.Items.Add(new QualityItem(label, height));
                 }
             }
@@ -247,13 +252,39 @@ namespace youtube_dowload
             if (rbAudio.Checked)
             {
                 cmbQuality.Enabled = false;
-                lblQualityDesc.Text = "Ses Formatı: MP3 (320 kbps En Yüksek Kalite)";
+                cmbProfile.Enabled = false;
+                lblQualityDesc.Text = "Ses Formatı: MP3 (320 kbps)";
             }
             else
             {
                 cmbQuality.Enabled = true;
+                cmbProfile.Enabled = true;
                 lblQualityDesc.Text = "Video Çözünürlüğü:";
             }
+        }
+
+        private void cmbProfile_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (cmbProfile.SelectedIndex == 1)
+                _settings.LastProfile = "BestQuality";
+            else if (cmbProfile.SelectedIndex == 2)
+                _settings.LastProfile = "ForceReencodeH264";
+            else
+                _settings.LastProfile = "WindowsCompatible";
+
+            SettingsService.Save(_settings);
+
+            if (_currentMetadata != null)
+            {
+                PopulateAvailableResolutions(_currentMetadata.AvailableResolutions);
+            }
+        }
+
+        private void cmbCookies_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            _settings.BrowserForCookies = cmbCookies.SelectedItem?.ToString() ?? "Yok";
+            _engine.BrowserForCookies = _settings.BrowserForCookies;
+            SettingsService.Save(_settings);
         }
 
         private void btnBrowseFolder_Click(object sender, EventArgs e)
@@ -288,14 +319,47 @@ namespace youtube_dowload
             }
 
             var selectedQuality = cmbQuality.SelectedItem as QualityItem;
+            DownloadProfile profile = DownloadProfile.WindowsCompatible;
+            if (cmbProfile.SelectedIndex == 1) profile = DownloadProfile.BestQuality;
+            else if (cmbProfile.SelectedIndex == 2) profile = DownloadProfile.ForceReencodeH264;
+
             var request = new DownloadRequest
             {
                 Url = url,
                 OutputDirectory = outDir,
                 IsAudioOnly = rbAudio.Checked,
                 TargetResolution = selectedQuality?.Resolution,
-                AudioFormat = "mp3"
+                AudioFormat = "mp3",
+                Profile = profile,
+                AllowReencodeIfH264Missing = false
             };
+
+            // Profil B için ön denetim: Videoda hiç H.264 akışı yoksa kullanıcıya sor
+            if (profile == DownloadProfile.WindowsCompatible && !request.IsAudioOnly && _currentMetadata != null && !_currentMetadata.HasH264Stream)
+            {
+                var ask = MessageBox.Show(
+                    "Bu videoda kaynak tarafından sunulan yerel H.264 (AVC) akışı bulunmuyor (yalnızca AV1 veya VP9 mevcut).\n\n" +
+                    "Windows Media Player ile tam uyumluluk için video FFmpeg ile H.264 formatına dönüştürülsün mü?\n\n" +
+                    "• [Evet]: İndir ve H.264'e dönüştür (Windows Media Player uyumlu)\n" +
+                    "• [Hayır]: Orijinal En İyi Kalite (AV1/VP9) olarak indir\n" +
+                    "• [İptal]: İndirmeyi iptal et",
+                    "H.264 Akışı Bulunamadı",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Question);
+
+                if (ask == DialogResult.Cancel)
+                {
+                    return;
+                }
+                else if (ask == DialogResult.Yes)
+                {
+                    request.AllowReencodeIfH264Missing = true;
+                }
+                else if (ask == DialogResult.No)
+                {
+                    request.Profile = DownloadProfile.BestQuality;
+                }
+            }
 
             SetUiState(isDownloading: true);
             lblStatus.Text = "İndirme başlatılıyor...";
@@ -335,19 +399,62 @@ namespace youtube_dowload
 
             try
             {
-                string resultFile = await _engine.DownloadAsync(request, progress, _downloadCts.Token);
-                _lastDownloadedFile = resultFile;
+                var downloadResult = await _engine.DownloadAsync(request, progress, _downloadCts.Token);
+                HandleDownloadSuccess(downloadResult, outDir);
+            }
+            catch (H264NotAvailableException ex)
+            {
+                lblStatus.Text = "H.264 Akışı Yok: Dönüştürme veya En İyi Kalite seçin.";
+                lblStatus.ForeColor = Color.DarkOrange;
+                lblProgressDetails.Text = "Yerel H.264 akışı bulunamadı.";
+                Logger.Log("H.264 bulunamadı: " + ex.Message);
 
-                progressBar1.Value = 100;
-                lblProgressPercent.Text = "%100";
-                lblStatus.Text = "Tebrikler! İndirme başarıyla tamamlandı.";
-                lblStatus.ForeColor = Color.DarkGreen;
-                lblProgressDetails.Text = "Dosya hazır: " + Path.GetFileName(resultFile ?? "");
+                var choice = MessageBox.Show(
+                    ex.Message + "\n\n" +
+                    "Windows Media Player ile tam uyumluluk için videoyu FFmpeg ile H.264 formatına dönüştürerek indirmek ister misiniz?\n\n" +
+                    "• [Evet]: İndir ve H.264'e dönüştür (Windows Media Player uyumlu)\n" +
+                    "• [Hayır]: Orijinal En İyi Kalite (AV1/VP9) olarak indir\n" +
+                    "• [İptal]: İndirmeyi iptal et",
+                    "H.264 Akışı Bulunamadı",
+                    MessageBoxButtons.YesNoCancel,
+                    MessageBoxIcon.Question);
 
-                btnOpenFile.Enabled = !string.IsNullOrEmpty(_lastDownloadedFile) && File.Exists(_lastDownloadedFile);
-                btnOpenFolder.Enabled = true;
-
-                MessageBox.Show("Video başarıyla indirildi!\n\nDosya: " + (resultFile ?? outDir), "İndirme Tamamlandı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (choice == DialogResult.Yes)
+                {
+                    request.AllowReencodeIfH264Missing = true;
+                    try
+                    {
+                        lblStatus.Text = "En İyi Kalite indiriliyor ve H.264'e dönüştürülecek...";
+                        var retryResult = await _engine.DownloadAsync(request, progress, _downloadCts.Token);
+                        HandleDownloadSuccess(retryResult, outDir);
+                    }
+                    catch (Exception retryEx)
+                    {
+                        HandleDownloadError(retryEx);
+                    }
+                }
+                else if (choice == DialogResult.No)
+                {
+                    request.Profile = DownloadProfile.BestQuality;
+                    try
+                    {
+                        lblStatus.Text = "En İyi Kalite (Orijinal codec) ile indiriliyor...";
+                        var retryResult = await _engine.DownloadAsync(request, progress, _downloadCts.Token);
+                        HandleDownloadSuccess(retryResult, outDir);
+                    }
+                    catch (Exception retryEx)
+                    {
+                        HandleDownloadError(retryEx);
+                    }
+                }
+            }
+            catch (MediaValidationException ex)
+            {
+                lblStatus.Text = "Medya Doğrulama Hatası!";
+                lblStatus.ForeColor = Color.DarkRed;
+                lblProgressDetails.Text = "Çıktı doğrulanamadı.";
+                Logger.LogError("Medya doğrulama hatası", ex);
+                MessageBox.Show($"İndirilen medya dosyası doğrulanamadı:\n\n{ex.Message}", "Doğrulama Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch (OperationCanceledException)
             {
@@ -365,16 +472,56 @@ namespace youtube_dowload
             }
             catch (Exception ex)
             {
-                lblStatus.Text = "İndirme başarısız oldu!";
-                lblStatus.ForeColor = Color.DarkRed;
-                lblProgressDetails.Text = "Hata oluştu.";
-                Logger.LogError("İndirme hatası", ex);
-                MessageBox.Show($"İndirme sırasında hata oluştu:\n\n{ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                HandleDownloadError(ex);
             }
             finally
             {
                 SetUiState(isDownloading: false);
             }
+        }
+
+        private void HandleDownloadSuccess(DownloadResult downloadResult, string outDir)
+        {
+            _lastDownloadedFile = downloadResult.FilePath;
+            progressBar1.Value = 100;
+            lblProgressPercent.Text = "%100";
+            lblStatus.Text = "Tebrikler! İndirme ve doğrulama başarıyla tamamlandı.";
+            lblStatus.ForeColor = Color.DarkGreen;
+
+            string fileName = Path.GetFileName(downloadResult.FilePath ?? "");
+            string codecInfo = downloadResult.Validation != null
+                ? $"Video: {downloadResult.Validation.VideoCodec.ToUpper()} | Ses: {downloadResult.Validation.AudioCodec.ToUpper()}"
+                : "Doğrulandı";
+
+            lblProgressDetails.Text = $"Dosya: {fileName} ({codecInfo})";
+
+            btnOpenFile.Enabled = !string.IsNullOrEmpty(_lastDownloadedFile) && File.Exists(_lastDownloadedFile);
+            btnOpenFolder.Enabled = true;
+
+            string infoMessage = $"Video başarıyla indirildi ve doğrulandı!\n\nDosya: {_lastDownloadedFile}";
+            if (downloadResult.Validation != null && downloadResult.Validation.HasVideo)
+            {
+                infoMessage += $"\n\nVideo Codec: {downloadResult.Validation.VideoCodec}\nSes Codec: {downloadResult.Validation.AudioCodec}\nÇözünürlük: {downloadResult.Validation.Width}x{downloadResult.Validation.Height}";
+                if (downloadResult.Validation.IsWindowsPlayerFriendly)
+                {
+                    infoMessage += "\n\n✔ Windows Media Player ile %100 uyumludur (H.264/AAC).";
+                }
+                else if (downloadResult.WasReencoded)
+                {
+                    infoMessage += "\n\n✔ FFmpeg ile H.264 formatına dönüştürüldü.";
+                }
+            }
+
+            MessageBox.Show(infoMessage, "İndirme Tamamlandı", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void HandleDownloadError(Exception ex)
+        {
+            lblStatus.Text = "İndirme başarısız oldu!";
+            lblStatus.ForeColor = Color.DarkRed;
+            lblProgressDetails.Text = "Hata oluştu.";
+            Logger.LogError("İndirme hatası", ex);
+            MessageBox.Show($"İndirme sırasında hata oluştu:\n\n{ex.Message}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
         private void btnCancel_Click(object sender, EventArgs e)

@@ -10,6 +10,8 @@ namespace youtube_dowload
         public string LastQuality { get; set; } = "auto";
         public bool IsAudioOnly { get; set; } = false;
         public string BrowserForCookies { get; set; } = "Yok";
+        public string LastProfile { get; set; } = "WindowsCompatible";
+        public bool AutoReencodeIfH264Missing { get; set; } = false;
     }
 
     public static class SettingsService
@@ -41,6 +43,10 @@ namespace youtube_dowload
                         {
                             settings.DownloadFolder = GetDefaultDownloadFolder();
                         }
+                        if (string.IsNullOrWhiteSpace(settings.LastProfile))
+                        {
+                            settings.LastProfile = "WindowsCompatible";
+                        }
                         return settings;
                     }
                 }
@@ -55,7 +61,9 @@ namespace youtube_dowload
                 DownloadFolder = GetDefaultDownloadFolder(),
                 LastQuality = "auto",
                 IsAudioOnly = false,
-                BrowserForCookies = "Yok"
+                BrowserForCookies = "Yok",
+                LastProfile = "WindowsCompatible",
+                AutoReencodeIfH264Missing = false
             };
         }
 
