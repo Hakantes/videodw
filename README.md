@@ -1,6 +1,54 @@
-# YouTube ve Video İndirici v2.0 (Windows Masaüstü Uygulaması)
+# 🎬 YouTube ve Video İndirici v2.0.1 (Windows)
 
-Modern Windows Forms (.NET Framework 4.8.1) mimarisinde geliştirilmiş, **yt-dlp** ve **FFmpeg** destekli yüksek performanslı video ve ses indirme uygulaması.
+Modern Windows Forms (.NET Framework 4.8.1) mimarisinde geliştirilmiş, **yt-dlp** ve **FFmpeg** destekli, yüksek kaliteli video ve ses indirme uygulaması.
+
+---
+
+## ⚡ Hızlı ve Kolay Kurulum
+
+Uygulamayı kullanmak için iki kolay seçenek bulunmaktadır:
+
+### 📦 Seçenek 1: Otomatik Kurulum Sihirbazı (Önerilen)
+Arkadaşlarınıza göndermek veya bilgisayarınıza zahmetsizce kurmak için en pratik yöntemdir:
+
+1. [Releases](https://github.com/Hakantes/videodw/releases/tag/v2.0.1) sayfasından **`VideoDownloader-Setup.exe`** dosyasını indirin.
+2. İndirdiğiniz kurulum dosyasına çift tıklayın.
+3. Kurulum sihirbazındaki adımları izleyin (*İleri > Kur*).
+4. Kurulum tamamlandığında masaüstünüze ve Başlat Menünüze kısayol eklenir; uygulama hemen açılmaya hazırdır!
+
+> **💡 Not:** Kurulum paketi `yt-dlp` ve `FFmpeg` motorlarını otomatik olarak kendi içinde barındırır. Bilgisayarınıza **Python, FFmpeg veya harici hiçbir araç kurmanız gerekmez**.
+
+---
+
+### 💼 Seçenek 2: Kurulumsuz Taşınabilir Sürüm (Portable)
+Herhangi bir kurulum yapmadan, USB bellekte veya istediğiniz klasörde doğrudan çalıştırmak isterseniz:
+
+1. [Releases](https://github.com/Hakantes/videodw/releases/tag/v2.0.1) sayfasından **`YouTubeDownloader_v2.0.1_Windows.zip`** dosyasını indirin.
+2. ZIP arşivini bir klasöre çıkartın.
+3. Klasör içindeki **`youtube dowload.exe`** dosyasına çift tıklayarak doğrudan kullanın.
+
+---
+
+## 🔒 Dosya Bütünlüğü ve Güvenlik (SHA-256 Checksums)
+
+İndirdiğiniz dosyaların orijinalliğini doğrulamak için aşağıdaki SHA-256 karma değerlerini kullanabilirsiniz:
+
+* **`VideoDownloader-Setup.exe`:**
+  ```text
+  41CDF5DA9F2BB66D2A1BA0C1E5CB1112B4FFA840DEF9EF343316529CD3C82A95
+  ```
+* **`YouTubeDownloader_v2.0.1_Windows.zip`:**
+  ```text
+  0D39FE03C620A739D625947A57F201583D1614F93D56C3BD4C4917E9612B0CEC
+  ```
+
+---
+
+## 🖥️ Sistem Gereksinimleri
+
+* **İşletim Sistemi:** Windows 10 veya Windows 11 (64-bit / 32-bit uyumlu)
+* **.NET Sürümü:** .NET Framework 4.8.1 *(Windows 11 ve güncel Windows 10 sistemlerinde hazır gelir; eksikse kurulum sihirbazı otomatik olarak resmi Microsoft sayfasına yönlendirir)*
+* **İnternet Bağlantısı:** Video indirmek için aktif internet bağlantısı.
 
 ---
 
@@ -9,6 +57,7 @@ Modern Windows Forms (.NET Framework 4.8.1) mimarisinde geliştirilmiş, **yt-dl
 1. **Gelişmiş Video ve Ses İndirme Motoru:**
    - **yt-dlp** (güncel YouTube API değişikliklerine ve bot korumalarına tam uyumlu).
    - YouTube haricinde Vimeo, Twitter/X, Dailymotion, Facebook, Instagram vb. platformları da destekler.
+   - YouTube bot koruması ve oturum gereksinimleri için **Tarayıcı Çerezleri** (Chrome, Edge, Firefox, Brave vb.) seçeneği.
    - Tek tıkla indirme motorunu güncelleme (`yt-dlp -U`) desteği.
 
 2. **Dinamik Çözünürlük ve Format Seçimi:**
@@ -17,7 +66,7 @@ Modern Windows Forms (.NET Framework 4.8.1) mimarisinde geliştirilmiş, **yt-dl
    - "En Yüksek Kalite (Otomatik)" modu ile en yüksek video ve ses akışı otomatik seçilir.
 
 3. **Gerçek Kalite ve FFmpeg Entegrasyonu:**
-   - 1080p, 2K ve 4K videolarda ayrı gelen yüksek kaliteli video ve ses akışları **FFmpeg** ile kayıpsız olarak MP4 kapsayıcısına birleştirilir (remux).
+   - 1080p, 2K ve 4K videolarda ayrı gelen yüksek kaliteli video ve ses akışları **FFmpeg** ile kayıpsız olarak MP4 kapsayıcısına birleştirilir (lossless remux).
    - Gereksiz yeniden kodlama (re-encode) yapılmaz, orijinal kalite korunur.
    - Yalnızca ses istendiğinde FFmpeg ile yüksek kaliteli **MP3 (320 kbps)** dönüştürmesi yapılır.
 
@@ -31,48 +80,34 @@ Modern Windows Forms (.NET Framework 4.8.1) mimarisinde geliştirilmiş, **yt-dl
 
 5. **Güvenilirlik ve Hata Yönetimi:**
    - Windows geçersiz dosya adı karakterleri otomatik temizlenir.
-   - Aynı isimli dosyaların üzerine yazılması engellenir.
+   - Aynı isimli videoların çakışmaması için `[VideoID]` şablonu ve `--no-overwrites` koruması.
    - Arayüz asla donmaz (`async/await` ve arka plan akış yönetimi).
    - Detaylı hata ve olay kayıtları için `logs/downloader.log` mekanizması.
 
 ---
 
-## 📁 Dağıtım ve Çalıştırma
-
-### Bağımsız Çalıştırma (Taşınabilir Sürüm):
-`Publish` klasörü altındaki `youtube dowload.exe` dosyasını çift tıklayarak doğrudan çalıştırabilirsiniz.
-Klasör içeriği:
-- `youtube dowload.exe` (Ana uygulama)
-- `yt-dlp.exe` (İndirme motoru)
-- `ffmpeg.exe` (Video ve ses birleştirici)
-- Gerekli .NET kütüphaneleri
-
-> **Not:** Uygulama Windows 10 ve Windows 11 üzerinde yerel olarak çalışır, ek bir Python veya geliştirme ortamı kurulumu **gerektirmez**.
-
----
-
 ## 🛠️ Geliştirici ve Derleme Bilgileri
 
-- **Geliştirme Dili:** C# (.NET Framework 4.8.1)
-- **Arayüz:** Windows Forms (WinForms)
-- **Çözüm Dosyası:** `youtube dowload.sln`
-- **Derleme Komutu:**
-  ```powershell
-  msbuild "youtube dowload.sln" /p:Configuration=Release
-  ```
+Kaynak koddan kendiniz derlemek isterseniz:
+
+```powershell
+# Paketleri geri yükle
+nuget restore "src/youtube-downloader/youtube dowload.sln"
+
+# Release modunda derle
+msbuild "src/youtube-downloader/youtube dowload.sln" /p:Configuration=Release
+```
+
+Kurulum dosyasını derlemek için Inno Setup 6 ile:
+```powershell
+iscc "installer.iss"
+```
 
 ---
 
-## 📋 Değişiklik Özeti (v1.0 -> v2.0)
+## 📋 Değişiklik Özeti (v2.0 -> v2.0.1)
 
-| Özellik | Eski Sürüm | Yeni Sürüm (v2.0) |
-|---|---|---|
-| **İndirme Motoru** | YoutubeExplode 6.4 (Cipher hatası veriyordu) | Güncel yt-dlp CLI motoru (Hatasız) |
-| **FFmpeg Entegrasyonu** | Kısmi / Kodlanmamış | Tam otomatik remux ve MP3 dönüştürme |
-| **Çözünürlük Seçenekleri** | Yok / Sabit | 4K, 2K, 1080p, 720p, 480p, 360p dinamik |
-| **Önizleme** | Yok | Küçük resim, kanal, süre ve başlık |
-| **İndirme Klasörü** | Hardcoded (`C:\Users\...\ABC`) | Kullanıcı seçimi + Kalıcı saklama |
-| **İptal Mekanizması** | Yok | CancellationToken & Process Tree Kill |
-| **Canlı Hız & ETA** | Yok | Anlık hız, kalan süre ve indirilen boyut |
-| **Hata & Loglama** | Sadece MessageBox | `logs/downloader.log` + Log butonu |
-| **Motor Güncelleme** | Yok | Tek tıkla güncelleme butonu |
+* 🛠️ **YouTube Bot Koruması Çözümü:** `Sign in to confirm you're not a bot` hatası için özel algılama ve tarayıcı çerezleri (`--cookies-from-browser`) desteği eklendi.
+* 📦 **Inno Setup Kurulum Sihirbazı:** Tek tıkla kurulan `VideoDownloader-Setup.exe` paketi oluşturuldu.
+* 🛡️ **Dosya Çakışma Koruması:** İndirilen dosya adlarına `[VideoID]` etiketi eklenerek aynı isimli videoların birbirini ezmesi önlendi.
+* ⚡ **Süreç İptal İyileştirmesi:** İptal butonuna basıldığında tüm alt süreçlerin (FFmpeg ve yt-dlp) anında sonlandırılması sağlandı.
