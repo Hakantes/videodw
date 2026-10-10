@@ -11,10 +11,10 @@ Uygulamayı kullanmak için iki kolay seçenek bulunmaktadır:
 ### 📦 Seçenek 1: Otomatik Kurulum Sihirbazı (Önerilen)
 Arkadaşlarınıza göndermek veya bilgisayarınıza zahmetsizce kurmak için en pratik yöntemdir:
 
-1. [Releases](https://github.com/Hakantes/videodw/releases/tag/v2.0.1) sayfasından **`VideoDownloader-Setup.exe`** dosyasını indirin.
-2. İndirdiğiniz kurulum dosyasına çift tıklayın.
-3. Kurulum sihirbazındaki adımları izleyin (*İleri > Kur*).
-4. Kurulum tamamlandığında masaüstünüze ve Başlat Menünüze kısayol eklenir; uygulama hemen açılmaya hazırdır!
+1. [Releases](https://github.com/Hakantes/videodw/releases/tag/v2.0.1) sayfasından [VideoDownloader-Setup.exe](https://github.com/Hakantes/videodw/releases/download/v2.0.1/VideoDownloader-Setup.exe) dosyasını indirin.
+3. İndirdiğiniz kurulum dosyasına çift tıklayın.
+4. Kurulum sihirbazındaki adımları izleyin (*İleri > Kur*).
+5. Kurulum tamamlandığında masaüstünüze ve Başlat Menünüze kısayol eklenir; uygulama hemen açılmaya hazırdır!
 
 > **💡 Not:** Kurulum paketi `yt-dlp` ve `FFmpeg` motorlarını otomatik olarak kendi içinde barındırır. Bilgisayarınıza **Python, FFmpeg veya harici hiçbir araç kurmanız gerekmez**.
 
