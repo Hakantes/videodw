@@ -302,13 +302,13 @@ namespace youtube_dowload
             // 
             // lblProgressDetails
             // 
-            this.lblProgressDetails.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(162)));
+            this.lblProgressDetails.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(162)));
             this.lblProgressDetails.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(80)))), ((int)(((byte)(80)))), ((int)(((byte)(80)))));
             this.lblProgressDetails.Location = new System.Drawing.Point(22, 77);
             this.lblProgressDetails.Name = "lblProgressDetails";
             this.lblProgressDetails.Size = new System.Drawing.Size(748, 20);
             this.lblProgressDetails.TabIndex = 3;
-            this.lblProgressDetails.Text = "Hız: - | Kalan Süre: - | İndirilen: -";
+            this.lblProgressDetails.Text = "İndirilen: -  •  Hız: -  •  Kalan süre: -";
             // 
             // lblProgressPercent
             // 
@@ -441,7 +441,7 @@ namespace youtube_dowload
             this.MaximizeBox = false;
             this.Name = "Form1";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "YouTube ve Video İndirici v2.0.2 (FFmpeg & yt-dlp)";
+            this.Text = "YouTube ve Video İndirici v2.0.3 (FFmpeg & yt-dlp)";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Form1_FormClosing);
             this.Load += new System.EventHandler(this.Form1_Load);
             this.grpVideoInfo.ResumeLayout(false);

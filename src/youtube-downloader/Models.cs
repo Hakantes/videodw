@@ -46,6 +46,20 @@ namespace youtube_dowload
         public bool AllowReencodeIfH264Missing { get; set; } = false;
     }
 
+    public enum DownloadStage
+    {
+        Starting,
+        DownloadingVideo,
+        DownloadingAudio,
+        MergingStreams,
+        ExtractingAudio,
+        Reencoding,
+        Validating,
+        Completed,
+        Failed,
+        Cancelled
+    }
+
     public class DownloadProgressReport
     {
         public double Percentage { get; set; }
@@ -54,6 +68,93 @@ namespace youtube_dowload
         public string TotalBytes { get; set; } = string.Empty;
         public string DownloadedBytes { get; set; } = string.Empty;
         public string StatusMessage { get; set; } = string.Empty;
+
+        // Structured live metrics
+        public long DownloadedBytesRaw { get; set; }
+        public long? TotalBytesRaw { get; set; }
+        public double SpeedBytesPerSec { get; set; }
+        public DownloadStage Stage { get; set; } = DownloadStage.Starting;
+
+        // User-friendly formatted fields
+        public string FormattedSizeProgress
+        {
+            get
+            {
+                string dl = FormatBytes(DownloadedBytesRaw);
+                if (TotalBytesRaw.HasValue && TotalBytesRaw.Value > 0)
+                {
+                    string total = FormatBytes(TotalBytesRaw.Value);
+                    int pct = Math.Min(100, Math.Max(0, (int)Math.Round(Percentage)));
+                    return $"İndirilen: {dl} / {total} (%{pct})";
+                }
+                return $"İndirilen: {dl} | Toplam boyut hesaplanıyor";
+            }
+        }
+
+        public string FormattedSpeed => FormatSpeed(SpeedBytesPerSec);
+
+        public string FormattedEta
+        {
+            get
+            {
+                if (Stage == DownloadStage.Completed) return "İndirme tamamlandı";
+                if (!TotalBytesRaw.HasValue || TotalBytesRaw.Value <= 0 || SpeedBytesPerSec <= 10)
+                    return "Kalan süre hesaplanıyor...";
+
+                long remaining = TotalBytesRaw.Value - DownloadedBytesRaw;
+                return FormatEta(remaining, SpeedBytesPerSec);
+            }
+        }
+
+        public static string FormatBytes(long bytes)
+        {
+            if (bytes < 0) bytes = 0;
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            if (bytes < 1024)
+                return $"{bytes} B";
+            double kb = bytes / 1024.0;
+            if (kb < 1024)
+                return $"{kb.ToString("F2", tr)} KB";
+            double mb = kb / 1024.0;
+            if (mb < 1024)
+                return $"{mb.ToString("F2", tr)} MB";
+            double gb = mb / 1024.0;
+            return $"{gb.ToString("F2", tr)} GB";
+        }
+
+        public static string FormatSpeed(double bytesPerSec)
+        {
+            if (bytesPerSec <= 0 || double.IsNaN(bytesPerSec) || double.IsInfinity(bytesPerSec))
+                return "Hız hesaplanıyor...";
+
+            var tr = new System.Globalization.CultureInfo("tr-TR");
+            if (bytesPerSec < 1024)
+                return $"{bytesPerSec.ToString("F2", tr)} B/sn";
+            double kb = bytesPerSec / 1024.0;
+            if (kb < 1024)
+                return $"{kb.ToString("F2", tr)} KB/sn";
+            double mb = kb / 1024.0;
+            if (mb < 1024)
+                return $"{mb.ToString("F2", tr)} MB/sn";
+            double gb = mb / 1024.0;
+            return $"{gb.ToString("F2", tr)} GB/sn";
+        }
+
+        public static string FormatEta(long remainingBytes, double bytesPerSec)
+        {
+            if (remainingBytes <= 0) return "00:00";
+            if (bytesPerSec <= 10 || double.IsNaN(bytesPerSec) || double.IsInfinity(bytesPerSec))
+                return "Kalan süre hesaplanıyor...";
+
+            double seconds = remainingBytes / bytesPerSec;
+            if (seconds <= 0 || double.IsNaN(seconds) || double.IsInfinity(seconds) || seconds > 86400 * 7)
+                return "Kalan süre hesaplanıyor...";
+
+            var ts = TimeSpan.FromSeconds(seconds);
+            if (ts.TotalHours >= 1)
+                return ts.ToString(@"hh\:mm\:ss");
+            return ts.ToString(@"mm\:ss");
+        }
     }
 
     public class MediaValidationResult

@@ -373,8 +373,9 @@ namespace youtube_dowload
             var sbArgs = new StringBuilder();
 
             // Progress template
+            sbArgs.Append("--no-colors ");
             sbArgs.Append("--newline ");
-            sbArgs.Append("--progress-template \"PROG:[%(progress._percent_str)s]|%(progress._speed_str)s|%(progress._eta_str)s|%(progress._total_bytes_str)s|%(progress._downloaded_bytes_str)s\" ");
+            sbArgs.Append("--progress-template \"download:PROG:%(progress)j\" ");
             sbArgs.Append("--print \"after_move:FINAL_FILE:%(filepath)s\" ");
             sbArgs.Append("--no-playlist ");
             sbArgs.Append("--no-warnings ");
@@ -438,6 +439,7 @@ namespace youtube_dowload
             using (var process = new Process { StartInfo = psi })
             {
                 var stderr = new StringBuilder();
+                var tracker = new DownloadProgressTracker(request.IsAudioOnly);
 
                 process.OutputDataReceived += (s, e) =>
                 {
@@ -452,39 +454,13 @@ namespace youtube_dowload
                         return;
                     }
 
-                    if (line.StartsWith("PROG:"))
+                    var report = tracker.ProcessLine(line);
+                    if (report != null && progress != null)
                     {
-                        var report = ParseProgressLine(line);
-                        if (report != null && progress != null)
+                        if (tracker.ShouldReport(report))
                         {
                             progress.Report(report);
                         }
-                        return;
-                    }
-
-                    if (line.Contains("[Merger]") || line.Contains("Merging formats"))
-                    {
-                        progress?.Report(new DownloadProgressReport
-                        {
-                            Percentage = 99,
-                            StatusMessage = "Video ve ses FFmpeg ile birleştiriliyor..."
-                        });
-                    }
-                    else if (line.Contains("[ExtractAudio]") || (line.Contains("Destination:") && line.EndsWith(".mp3")))
-                    {
-                        progress?.Report(new DownloadProgressReport
-                        {
-                            Percentage = 99,
-                            StatusMessage = "Ses MP3 formatına dönüştürülüyor..."
-                        });
-                    }
-                    else if (line.Contains("has already been downloaded"))
-                    {
-                        progress?.Report(new DownloadProgressReport
-                        {
-                            Percentage = 100,
-                            StatusMessage = "Dosya zaten indirilmiş."
-                        });
                     }
                 };
 
@@ -595,6 +571,16 @@ namespace youtube_dowload
                     }
                 }
 
+                // Validation stage notification
+                progress?.Report(new DownloadProgressReport
+                {
+                    Percentage = 99,
+                    Stage = DownloadStage.Validating,
+                    DownloadedBytesRaw = tracker.TotalDownloadedBytes,
+                    TotalBytesRaw = tracker.TotalExpectedBytes ?? tracker.TotalDownloadedBytes,
+                    StatusMessage = "Dosya doğrulanıyor..."
+                });
+
                 // Final media validation with ffprobe
                 var validation = await ValidateMediaFileAsync(downloadedFilePath, request.IsAudioOnly, cancellationToken);
                 if (!validation.IsValid)
@@ -604,6 +590,16 @@ namespace youtube_dowload
                 }
 
                 Logger.Log($"İndirme ve doğrulama başarıyla tamamlandı: {downloadedFilePath} (Video: {validation.VideoCodec}, Ses: {validation.AudioCodec})");
+
+                long finalSize = validation.FileSizeBytes > 0 ? validation.FileSizeBytes : tracker.TotalDownloadedBytes;
+                progress?.Report(new DownloadProgressReport
+                {
+                    Percentage = 100,
+                    Stage = DownloadStage.Completed,
+                    DownloadedBytesRaw = finalSize,
+                    TotalBytesRaw = finalSize,
+                    StatusMessage = "İndirme tamamlandı"
+                });
 
                 return new DownloadResult
                 {
@@ -984,12 +980,242 @@ namespace youtube_dowload
             }
         }
 
-        private static DownloadProgressReport ParseProgressLine(string line)
+        public static DownloadProgressReport ParseProgressLine(string line, bool isAudioOnly = false)
         {
-            try
+            if (string.IsNullOrEmpty(line)) return null;
+            var tracker = new DownloadProgressTracker(isAudioOnly);
+            return tracker.ProcessLine(line);
+        }
+
+        public class DownloadProgressTracker
+        {
+            private readonly bool _isAudioOnly;
+            private string _currentFilename = null;
+            private long _completedStreamsBytes = 0;
+            private long _currentStreamDownloadedBytes = 0;
+            private long? _currentStreamTotalBytes = null;
+            private double _smoothedSpeed = 0;
+            private int _streamIndex = 0;
+            private DownloadStage _currentStage;
+            private DateTime _lastReportTime = DateTime.MinValue;
+            private DownloadStage _lastReportedStage = DownloadStage.Starting;
+
+            public DownloadProgressTracker(bool isAudioOnly)
             {
-                string data = line.Substring("PROG:".Length);
-                string[] parts = data.Split('|');
+                _isAudioOnly = isAudioOnly;
+                _currentStage = isAudioOnly ? DownloadStage.DownloadingAudio : DownloadStage.DownloadingVideo;
+            }
+
+            public DownloadStage CurrentStage => _currentStage;
+            public long TotalDownloadedBytes => _completedStreamsBytes + _currentStreamDownloadedBytes;
+            public long? TotalExpectedBytes => _currentStreamTotalBytes.HasValue ? _completedStreamsBytes + _currentStreamTotalBytes.Value : (long?)null;
+            public double SmoothedSpeed => _smoothedSpeed;
+
+            public void Reset()
+            {
+                _currentFilename = null;
+                _completedStreamsBytes = 0;
+                _currentStreamDownloadedBytes = 0;
+                _currentStreamTotalBytes = null;
+                _smoothedSpeed = 0;
+                _streamIndex = 0;
+                _currentStage = _isAudioOnly ? DownloadStage.DownloadingAudio : DownloadStage.DownloadingVideo;
+                _lastReportTime = DateTime.MinValue;
+                _lastReportedStage = DownloadStage.Starting;
+            }
+
+            public bool ShouldReport(DownloadProgressReport report, int throttleMs = 100)
+            {
+                if (report == null) return false;
+                // Stage transitions or key boundary percentages should never be throttled
+                if (report.Stage != _lastReportedStage || report.Percentage >= 99 || report.Percentage <= 0)
+                {
+                    _lastReportedStage = report.Stage;
+                    _lastReportTime = DateTime.UtcNow;
+                    return true;
+                }
+
+                if ((DateTime.UtcNow - _lastReportTime).TotalMilliseconds >= throttleMs)
+                {
+                    _lastReportTime = DateTime.UtcNow;
+                    return true;
+                }
+
+                return false;
+            }
+
+            public DownloadProgressReport ProcessLine(string line)
+            {
+                if (string.IsNullOrEmpty(line)) return null;
+
+                if (line.Contains("[Merger]") || line.Contains("Merging formats"))
+                {
+                    _currentStage = DownloadStage.MergingStreams;
+                    return new DownloadProgressReport
+                    {
+                        Percentage = 99,
+                        Stage = DownloadStage.MergingStreams,
+                        DownloadedBytesRaw = TotalDownloadedBytes,
+                        TotalBytesRaw = TotalExpectedBytes ?? TotalDownloadedBytes,
+                        SpeedBytesPerSec = 0,
+                        StatusMessage = "Ses ve video birleştiriliyor..."
+                    };
+                }
+
+                if (line.Contains("[ExtractAudio]") || (line.Contains("Destination:") && line.EndsWith(".mp3")))
+                {
+                    _currentStage = DownloadStage.ExtractingAudio;
+                    return new DownloadProgressReport
+                    {
+                        Percentage = 99,
+                        Stage = DownloadStage.ExtractingAudio,
+                        DownloadedBytesRaw = TotalDownloadedBytes,
+                        TotalBytesRaw = TotalExpectedBytes ?? TotalDownloadedBytes,
+                        SpeedBytesPerSec = 0,
+                        StatusMessage = "Ses MP3 formatına dönüştürülüyor..."
+                    };
+                }
+
+                if (line.Contains("has already been downloaded"))
+                {
+                    _currentStage = DownloadStage.Completed;
+                    return new DownloadProgressReport
+                    {
+                        Percentage = 100,
+                        Stage = DownloadStage.Completed,
+                        StatusMessage = "Dosya zaten indirilmiş."
+                    };
+                }
+
+                if (line.StartsWith("PROG:"))
+                {
+                    string payload = line.Substring("PROG:".Length).Trim();
+                    if (payload.StartsWith("{") && payload.EndsWith("}"))
+                    {
+                        return ParseJsonPayload(payload);
+                    }
+                    else
+                    {
+                        return ParseLegacyPayload(payload);
+                    }
+                }
+
+                return null;
+            }
+
+            public DownloadProgressReport ParseJsonPayload(string json)
+            {
+                try
+                {
+                    using (var doc = JsonDocument.Parse(json))
+                    {
+                        var root = doc.RootElement;
+                        string filename = root.TryGetProperty("filename", out var fnProp) ? fnProp.GetString() :
+                                         (root.TryGetProperty("tmpfilename", out var tfnProp) ? tfnProp.GetString() : "");
+
+                        long downloaded = root.TryGetProperty("downloaded_bytes", out var dbProp) && dbProp.ValueKind == JsonValueKind.Number
+                            ? dbProp.GetInt64() : 0;
+
+                        long? total = null;
+                        if (root.TryGetProperty("total_bytes", out var tbProp) && tbProp.ValueKind == JsonValueKind.Number)
+                        {
+                            total = tbProp.GetInt64();
+                        }
+                        else if (root.TryGetProperty("total_bytes_estimate", out var tbeProp) && tbeProp.ValueKind == JsonValueKind.Number)
+                        {
+                            total = tbeProp.GetInt64();
+                        }
+
+                        double speed = 0;
+                        if (root.TryGetProperty("speed", out var spProp) && spProp.ValueKind == JsonValueKind.Number)
+                        {
+                            speed = spProp.GetDouble();
+                        }
+
+                        // Stream transition check
+                        if (!string.IsNullOrEmpty(filename) && _currentFilename != null && filename != _currentFilename)
+                        {
+                            _completedStreamsBytes += _currentStreamDownloadedBytes;
+                            _currentStreamDownloadedBytes = 0;
+                            _currentStreamTotalBytes = null;
+                            _streamIndex++;
+                        }
+
+                        _currentFilename = filename;
+                        _currentStreamDownloadedBytes = downloaded;
+                        if (total.HasValue && total.Value > 0)
+                        {
+                            _currentStreamTotalBytes = total.Value;
+                        }
+
+                        if (_isAudioOnly)
+                        {
+                            _currentStage = DownloadStage.DownloadingAudio;
+                        }
+                        else
+                        {
+                            if (IsAudioFilename(filename) || _streamIndex > 0)
+                            {
+                                _currentStage = DownloadStage.DownloadingAudio;
+                            }
+                            else
+                            {
+                                _currentStage = DownloadStage.DownloadingVideo;
+                            }
+                        }
+
+                        // Smooth speed using EMA
+                        if (speed > 0)
+                        {
+                            if (_smoothedSpeed <= 0)
+                                _smoothedSpeed = speed;
+                            else
+                                _smoothedSpeed = 0.3 * speed + 0.7 * _smoothedSpeed;
+                        }
+
+                        long totalDownloaded = _completedStreamsBytes + _currentStreamDownloadedBytes;
+                        long? totalExpected = null;
+                        if (_currentStreamTotalBytes.HasValue)
+                        {
+                            totalExpected = _completedStreamsBytes + _currentStreamTotalBytes.Value;
+                        }
+
+                        double percentage = 0;
+                        if (totalExpected.HasValue && totalExpected.Value > 0)
+                        {
+                            percentage = Math.Min(99.0, Math.Max(0.0, (totalDownloaded * 100.0) / totalExpected.Value));
+                        }
+                        else if (root.TryGetProperty("_percent_str", out var pctProp))
+                        {
+                            string rawPct = pctProp.GetString()?.Trim(' ', '%') ?? "";
+                            if (double.TryParse(rawPct, NumberStyles.Any, CultureInfo.InvariantCulture, out double parsedPct))
+                            {
+                                percentage = Math.Min(99.0, Math.Max(0.0, parsedPct));
+                            }
+                        }
+
+                        string stageText = _currentStage == DownloadStage.DownloadingAudio ? "Ses indiriliyor..." : "Video indiriliyor...";
+
+                        return new DownloadProgressReport
+                        {
+                            Percentage = percentage,
+                            DownloadedBytesRaw = totalDownloaded,
+                            TotalBytesRaw = totalExpected,
+                            SpeedBytesPerSec = _smoothedSpeed > 0 ? _smoothedSpeed : speed,
+                            Stage = _currentStage,
+                            StatusMessage = stageText
+                        };
+                    }
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            public DownloadProgressReport ParseLegacyPayload(string payload)
+            {
+                string[] parts = payload.Split('|');
                 if (parts.Length < 3) return null;
 
                 string rawPercent = parts[0].Trim('[', ']', ' ', '%');
@@ -1006,17 +1232,21 @@ namespace youtube_dowload
 
                 return new DownloadProgressReport
                 {
-                    Percentage = pct,
+                    Percentage = Math.Min(99.0, Math.Max(0.0, pct)),
                     Speed = string.IsNullOrWhiteSpace(speed) || speed == "NA" ? "" : speed,
                     Eta = string.IsNullOrWhiteSpace(eta) || eta == "NA" ? "" : eta,
                     TotalBytes = string.IsNullOrWhiteSpace(total) || total == "NA" ? "" : total,
                     DownloadedBytes = string.IsNullOrWhiteSpace(downloaded) || downloaded == "NA" ? "" : downloaded,
-                    StatusMessage = $"İndiriliyor... %{pct:F1}"
+                    Stage = _currentStage,
+                    StatusMessage = _currentStage == DownloadStage.DownloadingAudio ? "Ses indiriliyor..." : "Video indiriliyor..."
                 };
             }
-            catch
+
+            private static bool IsAudioFilename(string filename)
             {
-                return null;
+                if (string.IsNullOrEmpty(filename)) return false;
+                string lower = filename.ToLowerInvariant();
+                return lower.Contains(".m4a") || lower.Contains(".opus") || lower.Contains(".f140") || lower.Contains(".f251") || lower.Contains(".f249") || lower.Contains(".f250") || lower.Contains(".mp3");
             }
         }
 

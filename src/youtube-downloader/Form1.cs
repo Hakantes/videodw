@@ -374,22 +374,15 @@ namespace youtube_dowload
             {
                 if (report == null) return;
 
-                int pVal = Math.Min(100, Math.Max(0, (int)report.Percentage));
+                int pVal = Math.Min(100, Math.Max(0, (int)Math.Round(report.Percentage)));
                 progressBar1.Value = pVal;
                 lblProgressPercent.Text = $"%{pVal}";
 
-                var details = new List<string>();
-                if (!string.IsNullOrEmpty(report.Speed)) details.Add($"Hız: {report.Speed}");
-                if (!string.IsNullOrEmpty(report.Eta)) details.Add($"Kalan: {report.Eta}");
-                if (!string.IsNullOrEmpty(report.DownloadedBytes) || !string.IsNullOrEmpty(report.TotalBytes))
-                {
-                    details.Add($"{report.DownloadedBytes} / {report.TotalBytes}");
-                }
+                string sizeStr = report.FormattedSizeProgress;
+                string speedStr = report.FormattedSpeed;
+                string etaStr = report.FormattedEta;
 
-                if (details.Count > 0)
-                {
-                    lblProgressDetails.Text = string.Join("  |  ", details);
-                }
+                lblProgressDetails.Text = $"{sizeStr}   •   {speedStr}   •   {etaStr}";
 
                 if (!string.IsNullOrEmpty(report.StatusMessage))
                 {
@@ -493,7 +486,13 @@ namespace youtube_dowload
                 ? $"Video: {downloadResult.Validation.VideoCodec.ToUpper()} | Ses: {downloadResult.Validation.AudioCodec.ToUpper()}"
                 : "Doğrulandı";
 
-            lblProgressDetails.Text = $"Dosya: {fileName} ({codecInfo})";
+            string finalSize = downloadResult.Validation != null && downloadResult.Validation.FileSizeBytes > 0
+                ? DownloadProgressReport.FormatBytes(downloadResult.Validation.FileSizeBytes)
+                : "";
+
+            lblProgressDetails.Text = string.IsNullOrEmpty(finalSize)
+                ? $"Dosya: {fileName} ({codecInfo})   •   İndirme tamamlandı"
+                : $"İndirilen: {finalSize} / {finalSize} (%100)   •   Hız: Tamamlandı   •   İndirme tamamlandı";
 
             btnOpenFile.Enabled = !string.IsNullOrEmpty(_lastDownloadedFile) && File.Exists(_lastDownloadedFile);
             btnOpenFolder.Enabled = true;

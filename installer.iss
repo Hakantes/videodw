@@ -1,5 +1,5 @@
 #define MyAppName "YouTube ve Video İndirici"
-#define MyAppVersion "2.0.2"
+#define MyAppVersion "2.0.3"
 #define MyAppPublisher "Hakantes"
 #define MyAppURL "https://github.com/Hakantes/videodw"
 #define MyAppExeName "youtube dowload.exe"
