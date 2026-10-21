@@ -23,6 +23,7 @@ namespace youtube_dowload
             this.btnAnalyze = new System.Windows.Forms.Button();
             this.btnPaste = new System.Windows.Forms.Button();
             this.grpVideoInfo = new System.Windows.Forms.GroupBox();
+            this.lblEstimatedSize = new System.Windows.Forms.Label();
             this.lblVideoInfo = new System.Windows.Forms.Label();
             this.lblVideoTitle = new System.Windows.Forms.Label();
             this.picThumbnail = new System.Windows.Forms.PictureBox();
@@ -106,6 +107,7 @@ namespace youtube_dowload
             // 
             // grpVideoInfo
             // 
+            this.grpVideoInfo.Controls.Add(this.lblEstimatedSize);
             this.grpVideoInfo.Controls.Add(this.lblVideoInfo);
             this.grpVideoInfo.Controls.Add(this.lblVideoTitle);
             this.grpVideoInfo.Controls.Add(this.picThumbnail);
@@ -117,13 +119,23 @@ namespace youtube_dowload
             this.grpVideoInfo.TabStop = false;
             this.grpVideoInfo.Text = "Video Bilgileri";
             // 
+            // lblEstimatedSize
+            // 
+            this.lblEstimatedSize.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(162)));
+            this.lblEstimatedSize.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(16)))), ((int)(((byte)(124)))), ((int)(((byte)(65)))));
+            this.lblEstimatedSize.Location = new System.Drawing.Point(220, 104);
+            this.lblEstimatedSize.Name = "lblEstimatedSize";
+            this.lblEstimatedSize.Size = new System.Drawing.Size(550, 24);
+            this.lblEstimatedSize.TabIndex = 3;
+            this.lblEstimatedSize.Text = "Tahmini Boyut: -";
+            // 
             // lblVideoInfo
             // 
             this.lblVideoInfo.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(162)));
             this.lblVideoInfo.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
-            this.lblVideoInfo.Location = new System.Drawing.Point(220, 80);
+            this.lblVideoInfo.Location = new System.Drawing.Point(220, 62);
             this.lblVideoInfo.Name = "lblVideoInfo";
-            this.lblVideoInfo.Size = new System.Drawing.Size(550, 48);
+            this.lblVideoInfo.Size = new System.Drawing.Size(550, 38);
             this.lblVideoInfo.TabIndex = 2;
             this.lblVideoInfo.Text = "Kanal: - | Süre: -";
             // 
@@ -131,11 +143,11 @@ namespace youtube_dowload
             // 
             this.lblVideoTitle.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(162)));
             this.lblVideoTitle.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(30)))), ((int)(((byte)(30)))));
-            this.lblVideoTitle.Location = new System.Drawing.Point(220, 20);
+            this.lblVideoTitle.Location = new System.Drawing.Point(220, 18);
             this.lblVideoTitle.Name = "lblVideoTitle";
-            this.lblVideoTitle.Size = new System.Drawing.Size(550, 56);
+            this.lblVideoTitle.Size = new System.Drawing.Size(550, 42);
             this.lblVideoTitle.TabIndex = 1;
-            this.lblVideoTitle.Text = "Henüz bir video analiz edilmedi. Lütfen bağlantı girip 'Analiz Et' butonuna tıklayınız.";
+            this.lblVideoTitle.Text = "Henüz bir video analiz edilmedi. Lütfen bağlantı girip \'Analiz Et\' butonuna tıklayınız.";
             // 
             // picThumbnail
             // 
@@ -211,6 +223,7 @@ namespace youtube_dowload
             this.cmbQuality.Name = "cmbQuality";
             this.cmbQuality.Size = new System.Drawing.Size(335, 23);
             this.cmbQuality.TabIndex = 3;
+            this.cmbQuality.SelectedIndexChanged += new System.EventHandler(this.cmbQuality_SelectedIndexChanged);
             // 
             // lblProfileDesc
             // 
@@ -467,6 +480,7 @@ namespace youtube_dowload
         private System.Windows.Forms.PictureBox picThumbnail;
         private System.Windows.Forms.Label lblVideoTitle;
         private System.Windows.Forms.Label lblVideoInfo;
+        private System.Windows.Forms.Label lblEstimatedSize;
         private System.Windows.Forms.GroupBox grpOptions;
         private System.Windows.Forms.RadioButton rbVideo;
         private System.Windows.Forms.RadioButton rbAudio;

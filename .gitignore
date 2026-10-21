@@ -28,6 +28,7 @@ $RECYCLE.BIN/
 # Dağıtım ve paketler
 *.zip
 VideoDownloader-Setup.exe
+YouTubeDownloader_*_Windows/
 Output/
 Publish/
 ffmpeg_extracted/

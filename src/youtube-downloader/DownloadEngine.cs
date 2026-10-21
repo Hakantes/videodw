@@ -212,17 +212,77 @@ namespace youtube_dowload
             throw new Exception("Bilinmeyen bir hata oluştu.");
         }
 
+        public static int? ReadNullableInt(JsonElement parent, string propName)
+        {
+            if (!parent.TryGetProperty(propName, out var prop)) return null;
+            if (prop.ValueKind == JsonValueKind.Number)
+            {
+                if (prop.TryGetInt32(out int val)) return val;
+                if (prop.TryGetDouble(out double dVal)) return (int)Math.Round(dVal);
+            }
+            else if (prop.ValueKind == JsonValueKind.String)
+            {
+                string s = prop.GetString();
+                if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out double dVal))
+                    return (int)Math.Round(dVal);
+            }
+            return null;
+        }
+
+        public static long? ReadNullableLong(JsonElement parent, string propName)
+        {
+            if (!parent.TryGetProperty(propName, out var prop)) return null;
+            if (prop.ValueKind == JsonValueKind.Number)
+            {
+                if (prop.TryGetInt64(out long val)) return val;
+                if (prop.TryGetDouble(out double dVal)) return (long)Math.Round(dVal);
+            }
+            else if (prop.ValueKind == JsonValueKind.String)
+            {
+                string s = prop.GetString();
+                if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out double dVal))
+                    return (long)Math.Round(dVal);
+            }
+            return null;
+        }
+
+        public static double? ReadNullableDouble(JsonElement parent, string propName)
+        {
+            if (!parent.TryGetProperty(propName, out var prop)) return null;
+            if (prop.ValueKind == JsonValueKind.Number)
+            {
+                if (prop.TryGetDouble(out double dVal)) return dVal;
+            }
+            else if (prop.ValueKind == JsonValueKind.String)
+            {
+                string s = prop.GetString();
+                if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out double dVal))
+                    return dVal;
+            }
+            return null;
+        }
+
+        public static string ReadNullableString(JsonElement parent, string propName, string defaultValue = "")
+        {
+            if (!parent.TryGetProperty(propName, out var prop)) return defaultValue;
+            if (prop.ValueKind == JsonValueKind.String) return prop.GetString() ?? defaultValue;
+            if (prop.ValueKind == JsonValueKind.Number) return prop.ToString();
+            return defaultValue;
+        }
+
         public VideoMetadata ParseVideoInfoJson(string json, string url)
         {
             using (var doc = JsonDocument.Parse(json))
             {
                 var root = doc.RootElement;
 
-                string title = root.TryGetProperty("title", out var titleProp) ? titleProp.GetString() : "Bilinmeyen Video";
-                string uploader = root.TryGetProperty("uploader", out var uploaderProp) ? uploaderProp.GetString() :
-                                 (root.TryGetProperty("channel", out var chProp) ? chProp.GetString() : "Bilinmeyen Kanal");
-                double durationSec = root.TryGetProperty("duration", out var durProp) ? (durProp.ValueKind == JsonValueKind.Number ? durProp.GetDouble() : 0) : 0;
-                string thumbnail = root.TryGetProperty("thumbnail", out var thumbProp) ? thumbProp.GetString() : string.Empty;
+                string title = ReadNullableString(root, "title", "Bilinmeyen Video");
+                string uploader = ReadNullableString(root, "uploader", "");
+                if (string.IsNullOrEmpty(uploader))
+                    uploader = ReadNullableString(root, "channel", "Bilinmeyen Kanal");
+
+                double durationSec = ReadNullableDouble(root, "duration") ?? 0;
+                string thumbnail = ReadNullableString(root, "thumbnail", string.Empty);
 
                 var resolutions = new HashSet<int>();
                 var h264Resolutions = new HashSet<int>();
@@ -230,43 +290,76 @@ namespace youtube_dowload
                 var audioCodecs = new HashSet<string>();
                 bool hasAac = false;
 
+                var formatsList = new List<FormatMetadata>();
+
                 if (root.TryGetProperty("formats", out var formatsProp) && formatsProp.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var fmt in formatsProp.EnumerateArray())
                     {
-                        string vcodec = fmt.TryGetProperty("vcodec", out var vcProp) ? (vcProp.GetString() ?? "none") : "none";
-                        string acodec = fmt.TryGetProperty("acodec", out var acProp) ? (acProp.GetString() ?? "none") : "none";
-
-                        bool hasVideo = !string.IsNullOrEmpty(vcodec) && vcodec != "none";
-                        bool hasAudio = !string.IsNullOrEmpty(acodec) && acodec != "none";
-
-                        if (hasVideo)
+                        try
                         {
-                            string displayVCodec = NormalizeVideoCodecName(vcodec);
-                            videoCodecs.Add(displayVCodec);
+                            string formatId = ReadNullableString(fmt, "format_id", "");
+                            string ext = ReadNullableString(fmt, "ext", "");
+                            string vcodec = ReadNullableString(fmt, "vcodec", "none");
+                            string acodec = ReadNullableString(fmt, "acodec", "none");
 
-                            if (fmt.TryGetProperty("height", out var hProp) && hProp.ValueKind == JsonValueKind.Number)
+                            int? height = ReadNullableInt(fmt, "height");
+                            int? width = ReadNullableInt(fmt, "width");
+                            long? filesize = ReadNullableLong(fmt, "filesize");
+                            long? filesizeApprox = ReadNullableLong(fmt, "filesize_approx");
+                            double? tbr = ReadNullableDouble(fmt, "tbr");
+                            double? vbr = ReadNullableDouble(fmt, "vbr");
+                            double? abr = ReadNullableDouble(fmt, "abr");
+                            double? fps = ReadNullableDouble(fmt, "fps");
+
+                            var metaFmt = new FormatMetadata
                             {
-                                int height = hProp.GetInt32();
-                                if (height >= 144)
+                                FormatId = formatId,
+                                Ext = ext,
+                                VCodec = vcodec,
+                                ACodec = acodec,
+                                Height = height,
+                                Width = width,
+                                Filesize = filesize,
+                                FilesizeApprox = filesizeApprox,
+                                Tbr = tbr,
+                                Vbr = vbr,
+                                Abr = abr,
+                                Fps = fps
+                            };
+                            formatsList.Add(metaFmt);
+
+                            bool hasVideo = metaFmt.HasVideo;
+                            bool hasAudio = metaFmt.HasAudio;
+
+                            if (hasVideo)
+                            {
+                                string displayVCodec = NormalizeVideoCodecName(vcodec);
+                                videoCodecs.Add(displayVCodec);
+
+                                if (height.HasValue && height.Value >= 144)
                                 {
-                                    resolutions.Add(height);
+                                    resolutions.Add(height.Value);
                                     if (IsH264Codec(vcodec))
                                     {
-                                        h264Resolutions.Add(height);
+                                        h264Resolutions.Add(height.Value);
                                     }
                                 }
                             }
-                        }
 
-                        if (hasAudio)
-                        {
-                            string displayACodec = NormalizeAudioCodecName(acodec);
-                            audioCodecs.Add(displayACodec);
-                            if (IsAacCodec(acodec))
+                            if (hasAudio)
                             {
-                                hasAac = true;
+                                string displayACodec = NormalizeAudioCodecName(acodec);
+                                audioCodecs.Add(displayACodec);
+                                if (IsAacCodec(acodec))
+                                {
+                                    hasAac = true;
+                                }
                             }
+                        }
+                        catch (Exception exFmt)
+                        {
+                            Logger.Log($"Format öğesi ayrıştırma hatası (atlandı): {exFmt.Message}");
                         }
                     }
                 }
@@ -285,6 +378,7 @@ namespace youtube_dowload
                     AvailableH264Resolutions = sortedH264Resolutions,
                     VideoCodecs = videoCodecs.OrderBy(c => c).ToList(),
                     AudioCodecs = audioCodecs.OrderBy(c => c).ToList(),
+                    Formats = formatsList,
                     HasAacAudioStream = hasAac
                 };
             }
@@ -375,6 +469,7 @@ namespace youtube_dowload
             // Progress template
             sbArgs.Append("--no-colors ");
             sbArgs.Append("--newline ");
+            sbArgs.Append("--progress ");
             sbArgs.Append("--progress-template \"download:PROG:%(progress)j\" ");
             sbArgs.Append("--print \"after_move:FINAL_FILE:%(filepath)s\" ");
             sbArgs.Append("--no-playlist ");
@@ -382,6 +477,7 @@ namespace youtube_dowload
             sbArgs.Append("--windows-filenames ");
 
             // Performance & stability
+            sbArgs.Append("-N 4 ");
             sbArgs.Append("--concurrent-fragments 4 ");
             sbArgs.Append("--retries 10 ");
             sbArgs.Append("--fragment-retries 10 ");
@@ -439,17 +535,18 @@ namespace youtube_dowload
             using (var process = new Process { StartInfo = psi })
             {
                 var stderr = new StringBuilder();
-                var tracker = new DownloadProgressTracker(request.IsAudioOnly);
+                var tracker = new DownloadProgressTracker(request.IsAudioOnly, request.EstimatedTotalBytes, request.EstimatedAudioBytes);
 
                 process.OutputDataReceived += (s, e) =>
                 {
                     if (string.IsNullOrEmpty(e.Data)) return;
 
-                    string line = e.Data;
+                    string line = e.Data.Trim();
 
-                    if (line.StartsWith("FINAL_FILE:"))
+                    int finalIdx = line.IndexOf("FINAL_FILE:");
+                    if (finalIdx >= 0)
                     {
-                        downloadedFilePath = line.Substring("FINAL_FILE:".Length).Trim();
+                        downloadedFilePath = line.Substring(finalIdx + "FINAL_FILE:".Length).Trim();
                         Logger.Log($"Tamamlanan dosya: {downloadedFilePath}");
                         return;
                     }
@@ -467,7 +564,19 @@ namespace youtube_dowload
                 process.ErrorDataReceived += (s, e) =>
                 {
                     if (string.IsNullOrEmpty(e.Data)) return;
-                    stderr.AppendLine(e.Data);
+                    string line = e.Data.Trim();
+                    if (line.Contains("PROG:"))
+                    {
+                        var report = tracker.ProcessLine(line);
+                        if (report != null && progress != null && tracker.ShouldReport(report))
+                        {
+                            progress.Report(report);
+                        }
+                    }
+                    else
+                    {
+                        stderr.AppendLine(line);
+                    }
                 };
 
                 process.Start();
@@ -574,7 +683,7 @@ namespace youtube_dowload
                 // Validation stage notification
                 progress?.Report(new DownloadProgressReport
                 {
-                    Percentage = 99,
+                    Percentage = tracker.CurrentPercentage > 0 ? tracker.CurrentPercentage : 99,
                     Stage = DownloadStage.Validating,
                     DownloadedBytesRaw = tracker.TotalDownloadedBytes,
                     TotalBytesRaw = tracker.TotalExpectedBytes ?? tracker.TotalDownloadedBytes,
@@ -980,16 +1089,18 @@ namespace youtube_dowload
             }
         }
 
-        public static DownloadProgressReport ParseProgressLine(string line, bool isAudioOnly = false)
+        public static DownloadProgressReport ParseProgressLine(string line, bool isAudioOnly = false, long? estimatedTotalBytes = null)
         {
             if (string.IsNullOrEmpty(line)) return null;
-            var tracker = new DownloadProgressTracker(isAudioOnly);
+            var tracker = new DownloadProgressTracker(isAudioOnly, estimatedTotalBytes);
             return tracker.ProcessLine(line);
         }
 
         public class DownloadProgressTracker
         {
             private readonly bool _isAudioOnly;
+            private readonly long? _estimatedTotalBytes;
+            private readonly long? _estimatedAudioBytes;
             private string _currentFilename = null;
             private long _completedStreamsBytes = 0;
             private long _currentStreamDownloadedBytes = 0;
@@ -999,16 +1110,39 @@ namespace youtube_dowload
             private DownloadStage _currentStage;
             private DateTime _lastReportTime = DateTime.MinValue;
             private DownloadStage _lastReportedStage = DownloadStage.Starting;
+            private bool _isFirstReport = true;
+            private double _lastCalculatedPercentage = 0;
 
-            public DownloadProgressTracker(bool isAudioOnly)
+            public DownloadProgressTracker(bool isAudioOnly, long? estimatedTotalBytes = null, long? estimatedAudioBytes = null)
             {
                 _isAudioOnly = isAudioOnly;
+                _estimatedTotalBytes = estimatedTotalBytes;
+                _estimatedAudioBytes = estimatedAudioBytes;
                 _currentStage = isAudioOnly ? DownloadStage.DownloadingAudio : DownloadStage.DownloadingVideo;
             }
 
             public DownloadStage CurrentStage => _currentStage;
+            public double CurrentPercentage => _lastCalculatedPercentage;
             public long TotalDownloadedBytes => _completedStreamsBytes + _currentStreamDownloadedBytes;
-            public long? TotalExpectedBytes => _currentStreamTotalBytes.HasValue ? _completedStreamsBytes + _currentStreamTotalBytes.Value : (long?)null;
+            public long? TotalExpectedBytes
+            {
+                get
+                {
+                    if (_currentStreamTotalBytes.HasValue && _currentStreamTotalBytes.Value > 0)
+                    {
+                        if (_streamIndex == 0 && !_isAudioOnly)
+                        {
+                            if (_estimatedAudioBytes.HasValue && _estimatedAudioBytes.Value > 0)
+                                return _currentStreamTotalBytes.Value + _estimatedAudioBytes.Value;
+                            if (_estimatedTotalBytes.HasValue && _estimatedTotalBytes.Value > _currentStreamTotalBytes.Value)
+                                return _estimatedTotalBytes.Value;
+                            return _currentStreamTotalBytes.Value;
+                        }
+                        return _completedStreamsBytes + _currentStreamTotalBytes.Value;
+                    }
+                    return _estimatedTotalBytes;
+                }
+            }
             public double SmoothedSpeed => _smoothedSpeed;
 
             public void Reset()
@@ -1022,14 +1156,17 @@ namespace youtube_dowload
                 _currentStage = _isAudioOnly ? DownloadStage.DownloadingAudio : DownloadStage.DownloadingVideo;
                 _lastReportTime = DateTime.MinValue;
                 _lastReportedStage = DownloadStage.Starting;
+                _isFirstReport = true;
+                _lastCalculatedPercentage = 0;
             }
 
             public bool ShouldReport(DownloadProgressReport report, int throttleMs = 100)
             {
                 if (report == null) return false;
-                // Stage transitions or key boundary percentages should never be throttled
-                if (report.Stage != _lastReportedStage || report.Percentage >= 99 || report.Percentage <= 0)
+                // Stage transitions, completion or boundary percentages should never be throttled
+                if (_isFirstReport || report.Stage != _lastReportedStage || report.Stage == DownloadStage.Completed || report.Percentage >= 99)
                 {
+                    _isFirstReport = false;
                     _lastReportedStage = report.Stage;
                     _lastReportTime = DateTime.UtcNow;
                     return true;
@@ -1053,7 +1190,7 @@ namespace youtube_dowload
                     _currentStage = DownloadStage.MergingStreams;
                     return new DownloadProgressReport
                     {
-                        Percentage = 99,
+                        Percentage = _lastCalculatedPercentage > 0 ? _lastCalculatedPercentage : 99,
                         Stage = DownloadStage.MergingStreams,
                         DownloadedBytesRaw = TotalDownloadedBytes,
                         TotalBytesRaw = TotalExpectedBytes ?? TotalDownloadedBytes,
@@ -1067,7 +1204,7 @@ namespace youtube_dowload
                     _currentStage = DownloadStage.ExtractingAudio;
                     return new DownloadProgressReport
                     {
-                        Percentage = 99,
+                        Percentage = _lastCalculatedPercentage > 0 ? _lastCalculatedPercentage : 99,
                         Stage = DownloadStage.ExtractingAudio,
                         DownloadedBytesRaw = TotalDownloadedBytes,
                         TotalBytesRaw = TotalExpectedBytes ?? TotalDownloadedBytes,
@@ -1087,9 +1224,10 @@ namespace youtube_dowload
                     };
                 }
 
-                if (line.StartsWith("PROG:"))
+                int progIdx = line.IndexOf("PROG:");
+                if (progIdx >= 0)
                 {
-                    string payload = line.Substring("PROG:".Length).Trim();
+                    string payload = line.Substring(progIdx + "PROG:".Length).Trim();
                     if (payload.StartsWith("{") && payload.EndsWith("}"))
                     {
                         return ParseJsonPayload(payload);
@@ -1110,27 +1248,13 @@ namespace youtube_dowload
                     using (var doc = JsonDocument.Parse(json))
                     {
                         var root = doc.RootElement;
-                        string filename = root.TryGetProperty("filename", out var fnProp) ? fnProp.GetString() :
-                                         (root.TryGetProperty("tmpfilename", out var tfnProp) ? tfnProp.GetString() : "");
+                        string filename = ReadNullableString(root, "filename", "");
+                        if (string.IsNullOrEmpty(filename))
+                            filename = ReadNullableString(root, "tmpfilename", "");
 
-                        long downloaded = root.TryGetProperty("downloaded_bytes", out var dbProp) && dbProp.ValueKind == JsonValueKind.Number
-                            ? dbProp.GetInt64() : 0;
-
-                        long? total = null;
-                        if (root.TryGetProperty("total_bytes", out var tbProp) && tbProp.ValueKind == JsonValueKind.Number)
-                        {
-                            total = tbProp.GetInt64();
-                        }
-                        else if (root.TryGetProperty("total_bytes_estimate", out var tbeProp) && tbeProp.ValueKind == JsonValueKind.Number)
-                        {
-                            total = tbeProp.GetInt64();
-                        }
-
-                        double speed = 0;
-                        if (root.TryGetProperty("speed", out var spProp) && spProp.ValueKind == JsonValueKind.Number)
-                        {
-                            speed = spProp.GetDouble();
-                        }
+                        long downloaded = ReadNullableLong(root, "downloaded_bytes") ?? 0;
+                        long? total = ReadNullableLong(root, "total_bytes") ?? ReadNullableLong(root, "total_bytes_estimate");
+                        double speed = ReadNullableDouble(root, "speed") ?? 0.0;
 
                         // Stream transition check
                         if (!string.IsNullOrEmpty(filename) && _currentFilename != null && filename != _currentFilename)
@@ -1173,17 +1297,14 @@ namespace youtube_dowload
                                 _smoothedSpeed = 0.3 * speed + 0.7 * _smoothedSpeed;
                         }
 
-                        long totalDownloaded = _completedStreamsBytes + _currentStreamDownloadedBytes;
-                        long? totalExpected = null;
-                        if (_currentStreamTotalBytes.HasValue)
-                        {
-                            totalExpected = _completedStreamsBytes + _currentStreamTotalBytes.Value;
-                        }
+                        long totalDownloaded = TotalDownloadedBytes;
+                        long? totalExpected = TotalExpectedBytes;
 
                         double percentage = 0;
                         if (totalExpected.HasValue && totalExpected.Value > 0)
                         {
                             percentage = Math.Min(99.0, Math.Max(0.0, (totalDownloaded * 100.0) / totalExpected.Value));
+                            _lastCalculatedPercentage = percentage;
                         }
                         else if (root.TryGetProperty("_percent_str", out var pctProp))
                         {
@@ -1191,6 +1312,7 @@ namespace youtube_dowload
                             if (double.TryParse(rawPct, NumberStyles.Any, CultureInfo.InvariantCulture, out double parsedPct))
                             {
                                 percentage = Math.Min(99.0, Math.Max(0.0, parsedPct));
+                                _lastCalculatedPercentage = percentage;
                             }
                         }
 
@@ -1201,6 +1323,7 @@ namespace youtube_dowload
                             Percentage = percentage,
                             DownloadedBytesRaw = totalDownloaded,
                             TotalBytesRaw = totalExpected,
+                            EstimatedTotalBytes = _estimatedTotalBytes,
                             SpeedBytesPerSec = _smoothedSpeed > 0 ? _smoothedSpeed : speed,
                             Stage = _currentStage,
                             StatusMessage = stageText
@@ -1225,6 +1348,8 @@ namespace youtube_dowload
                     double.TryParse(rawPercent, NumberStyles.Any, CultureInfo.InvariantCulture, out pct);
                 }
 
+                _lastCalculatedPercentage = Math.Min(99.0, Math.Max(0.0, pct));
+
                 string speed = parts.Length > 1 ? parts[1].Trim() : "";
                 string eta = parts.Length > 2 ? parts[2].Trim() : "";
                 string total = parts.Length > 3 ? parts[3].Trim() : "";
@@ -1237,6 +1362,7 @@ namespace youtube_dowload
                     Eta = string.IsNullOrWhiteSpace(eta) || eta == "NA" ? "" : eta,
                     TotalBytes = string.IsNullOrWhiteSpace(total) || total == "NA" ? "" : total,
                     DownloadedBytes = string.IsNullOrWhiteSpace(downloaded) || downloaded == "NA" ? "" : downloaded,
+                    EstimatedTotalBytes = _estimatedTotalBytes,
                     Stage = _currentStage,
                     StatusMessage = _currentStage == DownloadStage.DownloadingAudio ? "Ses indiriliyor..." : "Video indiriliyor..."
                 };

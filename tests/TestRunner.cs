@@ -50,6 +50,20 @@ namespace TestSuite
             RunTest("25. FFmpeg Birleştirme ve ffprobe Doğrulama Aşamaları", TestMergingAndValidationStages);
             RunTest("26. UI Thread Performansı: Rapor Filtreleme ve Throttling", TestProcessExitAndThrottling);
 
+            // v2.0.3 Önceden Boyut Tahmini ve Canlı İlerleme Testleri (27-34)
+            RunTest("27. Boyut Tahmini: Bilinen Doğrudan Boyutlar (Video + Ses)", TestPreDownloadSizeEstimationKnownFilesize);
+            RunTest("28. Boyut Tahmini: Yaklaşık Boyut (filesize_approx)", TestPreDownloadSizeEstimationApproximateFilesize);
+            RunTest("29. Boyut Tahmini: Bitrate ve Süre Üzerinden Hesaplama", TestPreDownloadSizeEstimationBitrateDurationFallback);
+            RunTest("30. Boyut Tahmini: Veri Yoksa 'Boyut hesaplanamadı' Güvenliği", TestPreDownloadSizeEstimationMissingSizes);
+            RunTest("31. Boyut Tahmini: Windows Uyumlu Dönüştürme Uyarısı", TestPreDownloadSizeEstimationWindowsCompatibleReencoding);
+            RunTest("32. Boyut Tahmini: Yalnızca Ses (MP3) Formatı", TestPreDownloadSizeEstimationAudioOnly);
+            RunTest("33. Canlı İlerleme: Tahmini Toplam Boyut ile Kesintisiz MB Gösterimi", TestLiveProgressWithEstimatedTotalBytes);
+            RunTest("34. Throttling: İlk Raporun Anında İletilmesi ve Aşama Geçişleri", TestThrottlingInitialReportAndStageTransitions);
+            RunTest("35. JSON Ayrıştırma: Kayan Noktalı FPS (Storyboard) ve Güvenli Sayısal Tipler", TestJsonParsingWithFloatingPointFpsAndStoryboardFormats);
+            RunTest("36. Dayanıklılık: 24 Saati Aşan Süreler ve Sıfır Hata Boyut Tahmini", TestDurationExceeding24HoursAndEstimationSafety);
+            RunTest("37. Çoklu Akış: Video ve Ses Aşamalarında Kümülatif İlerleme Yüzdesi", TestMultiStreamProgressCalculation);
+            RunTest("38. Birleştirme ve Tamamlama: Yapay Yüzde Atlamalarını Engelleme", TestMergerAndValidationStageProgress);
+
             Console.WriteLine("\n-------------------------------------------------");
             Console.WriteLine($"SONUÇ: {_passed} Başarılı, {_failed} Başarısız (Toplam {_passed + _failed} Senaryo)");
             Console.WriteLine("-------------------------------------------------");
@@ -540,6 +554,260 @@ namespace TestSuite
             // Aşama değiştiğinde (örneğin Merging) throttle baypas edilmeli
             var repStageChange = new DownloadProgressReport { Stage = DownloadStage.MergingStreams, Percentage = 99 };
             Assert(tracker.ShouldReport(repStageChange, 100), "Aşama değişimi anında raporlanmalı");
+        }
+
+        static void TestPreDownloadSizeEstimationKnownFilesize()
+        {
+            var meta = new VideoMetadata
+            {
+                Duration = TimeSpan.FromMinutes(5),
+                Formats = new List<FormatMetadata>
+                {
+                    new FormatMetadata { FormatId = "137", VCodec = "avc1.640028", ACodec = "none", Height = 1080, Filesize = 100 * 1024 * 1024 }, // 100 MB
+                    new FormatMetadata { FormatId = "140", VCodec = "none", ACodec = "mp4a.40.2", Filesize = 20 * 1024 * 1024 } // 20 MB
+                }
+            };
+
+            var est = meta.EstimateSize(DownloadProfile.WindowsCompatible, 1080, false);
+            Assert(est.TotalSizeBytes.HasValue, "Toplam boyut hesaplanabilmeli");
+            Assert(est.TotalSizeBytes.Value == 120 * 1024 * 1024, "Toplam 120MB olmalı");
+            Assert(!est.IsApproximate, "Net filesize varsa IsApproximate false olmalı");
+            Assert(!est.NeedsReencoding, "H.264 mevcutsa reencode gerekmemeli");
+            Assert(est.FormattedSize.Contains("120"), "120 MB içermeli");
+        }
+
+        static void TestPreDownloadSizeEstimationApproximateFilesize()
+        {
+            var meta = new VideoMetadata
+            {
+                Duration = TimeSpan.FromMinutes(2),
+                Formats = new List<FormatMetadata>
+                {
+                    new FormatMetadata { FormatId = "248", VCodec = "vp09.00.51.08", ACodec = "none", Height = 1080, FilesizeApprox = 50 * 1024 * 1024 },
+                    new FormatMetadata { FormatId = "251", VCodec = "none", ACodec = "opus", FilesizeApprox = 10 * 1024 * 1024 }
+                }
+            };
+
+            var est = meta.EstimateSize(DownloadProfile.BestQuality, 1080, false);
+            Assert(est.TotalSizeBytes.HasValue, "Yaklaşık boyut hesaplanabilmeli");
+            Assert(est.TotalSizeBytes.Value == 60 * 1024 * 1024, "Toplam 60MB olmalı");
+            Assert(est.IsApproximate, "filesize_approx varsa IsApproximate true olmalı");
+            Assert(est.FormattedSize.Contains("~"), "Yaklaşık boyutta ~ işareti olmalı");
+            Assert(est.FormattedSize.Contains("Tahmini"), "Format stringi Tahmini içermeli");
+        }
+
+        static void TestPreDownloadSizeEstimationBitrateDurationFallback()
+        {
+            var meta = new VideoMetadata
+            {
+                Duration = TimeSpan.FromSeconds(100),
+                Formats = new List<FormatMetadata>
+                {
+                    // 800 kbps video -> 800 * 1000 / 8 * 100 = 10,000,000 bytes
+                    new FormatMetadata { FormatId = "136", VCodec = "avc1", ACodec = "none", Height = 720, Tbr = 800 },
+                    // 128 kbps audio -> 128 * 1000 / 8 * 100 = 1,600,000 bytes
+                    new FormatMetadata { FormatId = "140", VCodec = "none", ACodec = "mp4a", Tbr = 128 }
+                }
+            };
+
+            var est = meta.EstimateSize(DownloadProfile.WindowsCompatible, 720, false);
+            Assert(est.TotalSizeBytes.HasValue, "Bitrate ve süre üzerinden hesaplama yapılabilmeli");
+            Assert(est.TotalSizeBytes.Value == 11600000, "11.600.000 bayt hesaplanmalı");
+            Assert(est.IsApproximate, "Bitrate hesabı tahmini olmalı");
+        }
+
+        static void TestPreDownloadSizeEstimationMissingSizes()
+        {
+            var meta = new VideoMetadata
+            {
+                Duration = TimeSpan.Zero,
+                Formats = new List<FormatMetadata>
+                {
+                    new FormatMetadata { FormatId = "unknown", VCodec = "avc1", ACodec = "none", Height = 1080 }
+                }
+            };
+
+            var est = meta.EstimateSize(DownloadProfile.WindowsCompatible, 1080, false);
+            Assert(!est.TotalSizeBytes.HasValue, "Veri yoksa boyut null olmalı");
+            Assert(est.FormattedSize == "Boyut hesaplanamadı", "Sahte değer üretilmemeli, 'Boyut hesaplanamadı' gösterilmeli");
+        }
+
+        static void TestPreDownloadSizeEstimationWindowsCompatibleReencoding()
+        {
+            var meta = new VideoMetadata
+            {
+                Duration = TimeSpan.FromMinutes(1),
+                Formats = new List<FormatMetadata>
+                {
+                    // Sadece VP9 mevcut, H.264 yok
+                    new FormatMetadata { FormatId = "248", VCodec = "vp09", ACodec = "none", Height = 1080, Filesize = 80 * 1024 * 1024 },
+                    new FormatMetadata { FormatId = "251", VCodec = "none", ACodec = "opus", Filesize = 15 * 1024 * 1024 }
+                }
+            };
+
+            var est = meta.EstimateSize(DownloadProfile.WindowsCompatible, 1080, false);
+            Assert(est.NeedsReencoding, "H.264 akışı olmayan videoda Windows Uyumlu profil için dönüştürme gerekmeli");
+            Assert(est.FormattedSize.Contains("Dönüştürme"), "Kullanıcıya H.264 dönüştürmesi yapılacağı ve boyutun değişebileceği belirtilmeli");
+        }
+
+        static void TestPreDownloadSizeEstimationAudioOnly()
+        {
+            var meta = new VideoMetadata
+            {
+                Duration = TimeSpan.FromMinutes(3),
+                Formats = new List<FormatMetadata>
+                {
+                    new FormatMetadata { FormatId = "137", VCodec = "avc1", ACodec = "none", Height = 1080, Filesize = 80 * 1024 * 1024 },
+                    new FormatMetadata { FormatId = "140", VCodec = "none", ACodec = "mp4a.40.2", Abr = 128, Filesize = 5 * 1024 * 1024 },
+                    new FormatMetadata { FormatId = "251", VCodec = "none", ACodec = "opus", Abr = 160, Filesize = 6 * 1024 * 1024 }
+                }
+            };
+
+            var est = meta.EstimateSize(DownloadProfile.WindowsCompatible, null, true);
+            Assert(est.TotalSizeBytes.HasValue, "Ses boyutu hesaplanmalı");
+            Assert(est.TotalSizeBytes.Value == 6 * 1024 * 1024, "En yüksek bitrate/boyuta sahip ses akışı seçilmeli");
+            Assert(!est.FormattedSize.Contains("Boyut hesaplanamadı"), "Geçerli formatlanmış boyut dönmeli");
+        }
+
+        static void TestLiveProgressWithEstimatedTotalBytes()
+        {
+            long estimatedSize = 100 * 1024 * 1024; // 100 MB
+            var tracker = new DownloadEngine.DownloadProgressTracker(false, estimatedSize);
+
+            // yt-dlp total_bytes vermese bile (null):
+            var rep = tracker.ProcessLine("PROG:{\"status\":\"downloading\",\"filename\":\"v.mp4\",\"downloaded_bytes\":10485760,\"total_bytes\":null,\"speed\":2097152}");
+            Assert(rep != null, "Rapor üretilmeli");
+            Assert(rep.DownloadedBytesRaw == 10485760, "10 MB indirildi");
+            Assert(rep.TotalBytesRaw == estimatedSize, "total_bytes null olduğunda önceden hesaplanan tahmini boyut kullanılmalı");
+            Assert(rep.Percentage >= 9.9 && rep.Percentage <= 10.1, "%10 civarında yüzde hesaplanmalı");
+            Assert(rep.FormattedSizeProgress.Contains("10,00 MB") || rep.FormattedSizeProgress.Contains("10 MB"), "İndirilen MB bilgisi canlı gösterilmeli");
+            Assert(rep.FormattedSizeProgress.Contains("100,00 MB") || rep.FormattedSizeProgress.Contains("100 MB"), "Toplam MB bilgisi canlı gösterilmeli");
+        }
+
+        static void TestThrottlingInitialReportAndStageTransitions()
+        {
+            var tracker = new DownloadEngine.DownloadProgressTracker(false, 50000000);
+
+            // İlk rapor: %0 olsa bile anında raporlanmalı
+            var repFirst = new DownloadProgressReport { Stage = DownloadStage.DownloadingVideo, Percentage = 0, DownloadedBytesRaw = 0 };
+            Assert(tracker.ShouldReport(repFirst, 100), "İlk rapor (0%) anında iletilmeli");
+
+            // 10 ms sonra gelen aynı aşama raporu throttle edilmeli
+            var repSoon = new DownloadProgressReport { Stage = DownloadStage.DownloadingVideo, Percentage = 1, DownloadedBytesRaw = 500000 };
+            Assert(!tracker.ShouldReport(repSoon, 100), "100ms dolmadan gelen ara rapor filtrelenmeli");
+
+            // Aşama Audio'ya geçtiğinde anında raporlanmalı
+            var repAudio = new DownloadProgressReport { Stage = DownloadStage.DownloadingAudio, Percentage = 50, DownloadedBytesRaw = 25000000 };
+            Assert(tracker.ShouldReport(repAudio, 100), "Aşama değişimi anında iletilmeli");
+
+            // Tamamlanma anında raporlanmalı
+            var repComp = new DownloadProgressReport { Stage = DownloadStage.Completed, Percentage = 100, DownloadedBytesRaw = 50000000 };
+            Assert(tracker.ShouldReport(repComp, 100), "Tamamlanma anında iletilmeli");
+        }
+
+        static void TestJsonParsingWithFloatingPointFpsAndStoryboardFormats()
+        {
+            string complexJson = @"{
+                ""title"": ""Test Video with Floating FPS and Storyboard"",
+                ""uploader"": ""Test Channel"",
+                ""duration"": 250.5,
+                ""thumbnail"": ""https://example.com/thumb.jpg"",
+                ""formats"": [
+                    { ""format_id"": ""sb0"", ""vcodec"": ""none"", ""acodec"": ""none"", ""fps"": 0.06357279, ""height"": 90.0, ""width"": 160.0, ""filesize_approx"": 12345.67 },
+                    { ""format_id"": ""sb1"", ""vcodec"": ""none"", ""acodec"": ""none"", ""fps"": 0.125, ""filesize"": 54321 },
+                    { ""format_id"": ""137"", ""vcodec"": ""avc1.640028"", ""acodec"": ""none"", ""height"": 1080, ""fps"": 30.0, ""tbr"": 4500.5, ""filesize"": 80000000 },
+                    { ""format_id"": ""140"", ""vcodec"": ""none"", ""acodec"": ""mp4a.40.2"", ""abr"": 128.0, ""filesize"": 5000000 }
+                ]
+            }";
+
+            var engine = new DownloadEngine();
+            var meta = engine.ParseVideoInfoJson(complexJson, "https://example.com/watch?v=123");
+
+            Assert(meta != null, "Metadata başarıyla oluşturulmalı");
+            Assert(meta.Title == "Test Video with Floating FPS and Storyboard", "Başlık doğru ayrıştırılmalı");
+            Assert(meta.Formats.Count == 4, "Tüm 4 format başarıyla eklenmeli");
+
+            var sb0 = meta.Formats.FirstOrDefault(f => f.FormatId == "sb0");
+            Assert(sb0 != null, "sb0 storyboard formatı bulunmalı");
+            Assert(sb0.Fps.HasValue && Math.Abs(sb0.Fps.Value - 0.06357279) < 0.0001, "Kayan noktalı FPS başarıyla double olarak ayrıştırılmalı");
+            Assert(sb0.Height == 90, "Kayan noktalı yükseklik tam sayıya çevrilmeli");
+            Assert(sb0.FilesizeApprox == 12346, "Kayan noktalı filesize_approx tam sayıya yuvarlanmalı");
+
+            var f137 = meta.Formats.FirstOrDefault(f => f.FormatId == "137");
+            Assert(f137 != null && f137.Fps.HasValue && f137.Fps.Value == 30.0, "137 formatının 30.0 fps değeri double olarak ayrıştırılmalı");
+        }
+
+        static void TestDurationExceeding24HoursAndEstimationSafety()
+        {
+            var meta = new VideoMetadata
+            {
+                Title = "24 Saatten Uzun Video",
+                Duration = TimeSpan.FromSeconds(100000), // ~27.7 saat
+                Formats = new List<FormatMetadata>
+                {
+                    new FormatMetadata { FormatId = "137", VCodec = "avc1.640028", ACodec = "none", Height = 1080, Filesize = 500000000 },
+                    new FormatMetadata { FormatId = "140", VCodec = "none", ACodec = "mp4a.40.2", Filesize = 50000000 }
+                }
+            };
+
+            // 1. FormattedDuration kontrolü
+            string durStr = meta.FormattedDuration;
+            Assert(durStr.StartsWith("27:"), "24 saati aşan süre '27:xx:xx' formatında olmalı ve FormatException atmamalı");
+
+            // 2. EstimateSize kontrolü
+            var est = meta.EstimateSize(DownloadProfile.WindowsCompatible, 1080, false);
+            Assert(est.TotalSizeBytes.HasValue, "Boyut başarıyla hesaplanmalı");
+            Assert(!string.IsNullOrEmpty(est.FormattedSize), "FormattedSize boş olmamalı");
+
+            // 3. Boş format listesi ile dayanıklılık
+            var emptyMeta = new VideoMetadata { Formats = new List<FormatMetadata>() };
+            var emptyEst = emptyMeta.EstimateSize(DownloadProfile.WindowsCompatible, 1080, false);
+            Assert(emptyEst.FormattedSize == "Boyut hesaplanamadı", "Format yoksa 'Boyut hesaplanamadı' dönmeli");
+        }
+
+        static void TestMultiStreamProgressCalculation()
+        {
+            long videoBytes = 20 * 1024 * 1024; // 20 MB
+            long audioBytes = 5 * 1024 * 1024;  // 5 MB
+            long totalBytes = videoBytes + audioBytes; // 25 MB
+
+            var tracker = new DownloadEngine.DownloadProgressTracker(false, totalBytes, audioBytes);
+
+            // 1. Video akışı: 10 MB indirildi (Toplam 25 MB'ın %40'ı)
+            var rep1 = tracker.ProcessLine("PROG:{\"status\":\"downloading\",\"filename\":\"video.f137.mp4\",\"downloaded_bytes\":10485760,\"total_bytes\":20971520,\"speed\":2000000}");
+            Assert(rep1 != null, "Rapor 1 üretilmeli");
+            Assert(rep1.Stage == DownloadStage.DownloadingVideo, "Aşama DownloadingVideo olmalı");
+            Assert(Math.Abs(rep1.Percentage - 40.0) < 1.0, $"İlk aşamada yüzde ~%40 olmalı, bulunan: {rep1.Percentage}");
+
+            // 2. Video akışı bitti: 20 MB indirildi (Toplam 25 MB'ın %80'i)
+            var rep2 = tracker.ProcessLine("PROG:{\"status\":\"downloading\",\"filename\":\"video.f137.mp4\",\"downloaded_bytes\":20971520,\"total_bytes\":20971520,\"speed\":2000000}");
+            Assert(rep2 != null, "Rapor 2 üretilmeli");
+            Assert(Math.Abs(rep2.Percentage - 80.0) < 1.0, $"Video bitiminde yüzde ~%80 olmalı, bulunan: {rep2.Percentage}");
+
+            // 3. Ses akışı başladı: Dosya adı değişti, sesin yarısı (2.5 MB) indirildi. Kümülatif: 20 + 2.5 = 22.5 MB (%90)
+            var rep3 = tracker.ProcessLine("PROG:{\"status\":\"downloading\",\"filename\":\"audio.f140.m4a\",\"downloaded_bytes\":2621440,\"total_bytes\":5242880,\"speed\":2000000}");
+            Assert(rep3 != null, "Rapor 3 üretilmeli");
+            Assert(rep3.Stage == DownloadStage.DownloadingAudio, "Aşama DownloadingAudio olmalı");
+            Assert(rep3.DownloadedBytesRaw == 20971520 + 2621440, "Kümülatif indirilen byte doğru hesaplanmalı");
+            Assert(Math.Abs(rep3.Percentage - 90.0) < 1.0, $"Ses indirilirken kümülatif yüzde ~%90 olmalı, bulunan: {rep3.Percentage}");
+
+            // 4. Ses akışı da bitti: 5 MB indirildi. Toplam 25 MB. Yüzde 99'a dayanmalı (0-99 sınırı).
+            var rep4 = tracker.ProcessLine("PROG:{\"status\":\"downloading\",\"filename\":\"audio.f140.m4a\",\"downloaded_bytes\":5242880,\"total_bytes\":5242880,\"speed\":2000000}");
+            Assert(rep4 != null, "Rapor 4 üretilmeli");
+            Assert(rep4.Percentage >= 98.9 && rep4.Percentage <= 99.0, $"İndirme bitişinde yüzde 99'da sınırlandırılmalı, bulunan: {rep4.Percentage}");
+        }
+
+        static void TestMergerAndValidationStageProgress()
+        {
+            var tracker = new DownloadEngine.DownloadProgressTracker(false, 30000000);
+            tracker.ProcessLine("PROG:{\"status\":\"downloading\",\"filename\":\"test.mp4\",\"downloaded_bytes\":15000000,\"total_bytes\":30000000,\"speed\":1000000}");
+            Assert(Math.Abs(tracker.CurrentPercentage - 50.0) < 1.0, "Mevcut yüzde 50 olmalı");
+
+            // Birleştirme aşaması
+            var repMerger = tracker.ProcessLine("[Merger] Merging formats into \"out.mp4\"");
+            Assert(repMerger != null, "Merger raporu üretilmeli");
+            Assert(repMerger.Stage == DownloadStage.MergingStreams, "Aşama MergingStreams olmalı");
+            Assert(Math.Abs(repMerger.Percentage - 50.0) < 1.0, "Merger sırasında önceki gerçek yüzde korunmalı, yapay %99'a sıçramamalı");
         }
 
         static void Assert(bool condition, string message)

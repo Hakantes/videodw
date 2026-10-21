@@ -120,9 +120,9 @@ namespace youtube_dowload
             }
 
             SetUiState(isAnalyzing: true);
-            lblStatus.Text = "Video bilgileri ve formatları analiz ediliyor...";
+            lblStatus.Text = "URL analiz ediliyor...";
             lblStatus.ForeColor = Color.DarkBlue;
-            lblProgressDetails.Text = "Bilgiler alınıyor...";
+            lblProgressDetails.Text = "Video bilgileri ve tahmini boyut alınıyor...";
 
             _analyzeCts = new CancellationTokenSource();
 
@@ -143,6 +143,9 @@ namespace youtube_dowload
 
                 // Çözünürlükleri profil durumuna göre doldur
                 PopulateAvailableResolutions(_currentMetadata.AvailableResolutions);
+
+                // Tahmini boyutu anında göster
+                UpdateEstimatedSizeDisplay();
 
                 lblStatus.Text = "Analiz tamamlandı. İndirmeye hazır.";
                 lblStatus.ForeColor = Color.DarkGreen;
@@ -261,6 +264,7 @@ namespace youtube_dowload
                 cmbProfile.Enabled = true;
                 lblQualityDesc.Text = "Video Çözünürlüğü:";
             }
+            UpdateEstimatedSizeDisplay();
         }
 
         private void cmbProfile_SelectedIndexChanged(object sender, EventArgs e)
@@ -277,6 +281,52 @@ namespace youtube_dowload
             if (_currentMetadata != null)
             {
                 PopulateAvailableResolutions(_currentMetadata.AvailableResolutions);
+            }
+            UpdateEstimatedSizeDisplay();
+        }
+
+        private void cmbQuality_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            UpdateEstimatedSizeDisplay();
+        }
+
+        private void UpdateEstimatedSizeDisplay()
+        {
+            try
+            {
+                if (_currentMetadata == null)
+                {
+                    lblEstimatedSize.Text = "Tahmini Boyut: -";
+                    return;
+                }
+
+                var selectedQuality = cmbQuality.SelectedItem as QualityItem;
+                DownloadProfile profile = DownloadProfile.WindowsCompatible;
+                if (cmbProfile.SelectedIndex == 1) profile = DownloadProfile.BestQuality;
+                else if (cmbProfile.SelectedIndex == 2) profile = DownloadProfile.ForceReencodeH264;
+
+                bool isAudioOnly = rbAudio.Checked;
+                var est = _currentMetadata.EstimateSize(profile, selectedQuality?.Resolution, isAudioOnly);
+
+                string formatName = isAudioOnly
+                    ? "MP3 (320 kbps)"
+                    : (est.VideoCodec != null ? DownloadEngine.NormalizeVideoCodecName(est.VideoCodec) : "MP4 (H.264)");
+
+                string qualityLabel = isAudioOnly ? "320 kbps" : (selectedQuality?.Label ?? "En Yüksek Kalite");
+
+                lblEstimatedSize.Text = $"Tahmini Boyut: {est.FormattedSize}  •  Format: {formatName}  •  Kalite: {qualityLabel}";
+                lblEstimatedSize.ForeColor = est.TotalSizeBytes.HasValue ? Color.FromArgb(16, 124, 65) : Color.DarkOrange;
+
+                if (btnDownload.Enabled && progressBar1.Value == 0)
+                {
+                    lblProgressDetails.Text = $"İndirmeye hazır  •  Tahmini Boyut: {est.FormattedSize}  •  Format: {formatName}  •  Kalite: {qualityLabel}";
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log("Boyut güncelleme hatası: " + ex.Message);
+                lblEstimatedSize.Text = "Tahmini Boyut: Boyut hesaplanamadı";
+                lblEstimatedSize.ForeColor = Color.DarkOrange;
             }
         }
 
@@ -323,6 +373,15 @@ namespace youtube_dowload
             if (cmbProfile.SelectedIndex == 1) profile = DownloadProfile.BestQuality;
             else if (cmbProfile.SelectedIndex == 2) profile = DownloadProfile.ForceReencodeH264;
 
+            long? estimatedSize = null;
+            long? estimatedAudioSize = null;
+            if (_currentMetadata != null)
+            {
+                var est = _currentMetadata.EstimateSize(profile, selectedQuality?.Resolution, rbAudio.Checked);
+                estimatedSize = est.TotalSizeBytes;
+                estimatedAudioSize = est.AudioSizeBytes;
+            }
+
             var request = new DownloadRequest
             {
                 Url = url,
@@ -331,7 +390,9 @@ namespace youtube_dowload
                 TargetResolution = selectedQuality?.Resolution,
                 AudioFormat = "mp3",
                 Profile = profile,
-                AllowReencodeIfH264Missing = false
+                AllowReencodeIfH264Missing = false,
+                EstimatedTotalBytes = estimatedSize,
+                EstimatedAudioBytes = estimatedAudioSize
             };
 
             // Profil B için ön denetim: Videoda hiç H.264 akışı yoksa kullanıcıya sor
@@ -362,33 +423,19 @@ namespace youtube_dowload
             }
 
             SetUiState(isDownloading: true);
-            lblStatus.Text = "İndirme başlatılıyor...";
+            string startStageText = request.IsAudioOnly ? "Ses indiriliyor..." : "Video indiriliyor...";
+            lblStatus.Text = startStageText;
             lblStatus.ForeColor = Color.DarkBlue;
+            progressBar1.Style = ProgressBarStyle.Blocks;
             progressBar1.Value = 0;
             lblProgressPercent.Text = "%0";
-            lblProgressDetails.Text = "Hazırlanıyor...";
+
+            string estStr = estimatedSize.HasValue ? DownloadProgressReport.FormatBytes(estimatedSize.Value) : "Hesaplanıyor...";
+            lblProgressDetails.Text = $"İndirilen: 0 B / {estStr} (%0)   •   Hız: Başlatılıyor...   •   Kalan süre: Hesaplanıyor...";
 
             _downloadCts = new CancellationTokenSource();
 
-            var progress = new Progress<DownloadProgressReport>(report =>
-            {
-                if (report == null) return;
-
-                int pVal = Math.Min(100, Math.Max(0, (int)Math.Round(report.Percentage)));
-                progressBar1.Value = pVal;
-                lblProgressPercent.Text = $"%{pVal}";
-
-                string sizeStr = report.FormattedSizeProgress;
-                string speedStr = report.FormattedSpeed;
-                string etaStr = report.FormattedEta;
-
-                lblProgressDetails.Text = $"{sizeStr}   •   {speedStr}   •   {etaStr}";
-
-                if (!string.IsNullOrEmpty(report.StatusMessage))
-                {
-                    lblStatus.Text = report.StatusMessage;
-                }
-            });
+            var progress = new Progress<DownloadProgressReport>(report => UpdateProgressUi(report));
 
             try
             {
@@ -451,12 +498,14 @@ namespace youtube_dowload
             }
             catch (OperationCanceledException)
             {
+                progressBar1.Style = ProgressBarStyle.Blocks;
                 lblStatus.Text = "İndirme işlemi iptal edildi.";
                 lblStatus.ForeColor = Color.DarkOrange;
                 lblProgressDetails.Text = "İptal edildi.";
             }
             catch (BotVerificationException ex)
             {
+                progressBar1.Style = ProgressBarStyle.Blocks;
                 lblStatus.Text = "YouTube Bot Koruması: Oturum açmanız gerekiyor.";
                 lblStatus.ForeColor = Color.DarkOrange;
                 lblProgressDetails.Text = "Bot doğrulaması hatası.";
@@ -473,9 +522,59 @@ namespace youtube_dowload
             }
         }
 
+        private void UpdateProgressUi(DownloadProgressReport report)
+        {
+            if (report == null) return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => UpdateProgressUi(report)));
+                return;
+            }
+
+            bool hasKnownTotal = (report.TotalBytesRaw.HasValue && report.TotalBytesRaw.Value > 0) ||
+                                 (report.EstimatedTotalBytes.HasValue && report.EstimatedTotalBytes.Value > 0);
+
+            if (report.Stage == DownloadStage.Completed)
+            {
+                progressBar1.Style = ProgressBarStyle.Blocks;
+                progressBar1.Value = 100;
+                lblProgressPercent.Text = "%100";
+            }
+            else if (hasKnownTotal || report.Percentage > 0)
+            {
+                int pVal = Math.Min(99, Math.Max(0, (int)Math.Round(report.Percentage)));
+                progressBar1.Style = ProgressBarStyle.Blocks;
+                progressBar1.Value = pVal;
+                lblProgressPercent.Text = $"%{pVal}";
+            }
+            else
+            {
+                // Toplam boyut bilinmiyorsa sahte yüzde üretme: Belirsiz (Marquee) çubuk
+                if (progressBar1.Style != ProgressBarStyle.Marquee)
+                {
+                    progressBar1.Style = ProgressBarStyle.Marquee;
+                    progressBar1.MarqueeAnimationSpeed = 30;
+                }
+                lblProgressPercent.Text = "İndiriliyor...";
+            }
+
+            string sizeStr = report.FormattedSizeProgress;
+            string speedStr = report.FormattedSpeed;
+            string etaStr = report.FormattedEta;
+
+            lblProgressDetails.Text = $"{sizeStr}   •   {speedStr}   •   {etaStr}";
+
+            if (!string.IsNullOrEmpty(report.StatusMessage))
+            {
+                lblStatus.Text = report.StatusMessage;
+            }
+        }
+
         private void HandleDownloadSuccess(DownloadResult downloadResult, string outDir)
         {
             _lastDownloadedFile = downloadResult.FilePath;
+            progressBar1.Style = ProgressBarStyle.Blocks;
             progressBar1.Value = 100;
             lblProgressPercent.Text = "%100";
             lblStatus.Text = "Tebrikler! İndirme ve doğrulama başarıyla tamamlandı.";
@@ -516,6 +615,7 @@ namespace youtube_dowload
 
         private void HandleDownloadError(Exception ex)
         {
+            progressBar1.Style = ProgressBarStyle.Blocks;
             lblStatus.Text = "İndirme başarısız oldu!";
             lblStatus.ForeColor = Color.DarkRed;
             lblProgressDetails.Text = "Hata oluştu.";
