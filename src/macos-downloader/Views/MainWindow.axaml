@@ -1,0 +1,173 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:YouTubeDownloader.Mac.ViewModels"
+        xmlns:models="using:YouTubeDownloader.Mac.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="700"
+        x:Class="YouTubeDownloader.Mac.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="YouTube ve Video İndirici (macOS Apple Silicon v2.1.0)"
+        Width="780" Height="700"
+        MinWidth="650" MinHeight="600"
+        WindowStartupLocation="CenterScreen">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Border Padding="24">
+            <StackPanel Spacing="16">
+
+                <!-- Header & Update Banner -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="🎬 YouTube ve Video İndirici" FontSize="20" FontWeight="SemiBold"/>
+                            <Border Background="#2B579A" CornerRadius="4" Padding="6,2">
+                                <TextBlock Text="macOS ARM64 v2.1.0" FontSize="11" Foreground="White" FontWeight="Medium"/>
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="Apple Silicon için optimize edilmiş yerel video ve ses indirici"
+                                   FontSize="12" Foreground="Gray"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button Content="🔄 Güncellemeleri Denetle"
+                                Command="{Binding CheckUpdatesManualCommand}"
+                                FontSize="12" Padding="10,6"/>
+                        <Button Content="{Binding UpdateText}"
+                                Command="{Binding ApplyUpdateCommand}"
+                                IsVisible="{Binding HasUpdate}"
+                                Background="#107C41" Foreground="White"
+                                FontWeight="Bold" FontSize="12" Padding="12,6"/>
+                    </StackPanel>
+                </Grid>
+
+                <Separator Height="1" Background="#E0E0E0"/>
+
+                <!-- Dependency Warning Bar -->
+                <Border Background="#FFF4CE" BorderBrush="#FDE047" BorderThickness="1" CornerRadius="6"
+                        Padding="12,8" IsVisible="{Binding !DependenciesOk}">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Grid.Column="0" Text="⚠️ " FontSize="16" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="1" Text="{Binding DependenciesMessage}"
+                                   Foreground="#713F12" FontSize="12" TextWrapping="Wrap"/>
+                    </Grid>
+                </Border>
+
+                <!-- URL Input Section -->
+                <Border Background="#F9FAFB" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Video Bağlantısı (URL):" FontWeight="Medium" FontSize="13"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding Url, Mode=TwoWay}"
+                                     Watermark="https://www.youtube.com/watch?v=..."
+                                     FontSize="13" Padding="10,8" Margin="0,0,8,0"/>
+                            <Button Grid.Column="1"
+                                    Content="🔍 Analiz Et"
+                                    Command="{Binding AnalyzeCommand}"
+                                    IsEnabled="{Binding !IsAnalyzing}"
+                                    Background="#0066CC" Foreground="White"
+                                    FontWeight="SemiBold" FontSize="13" Padding="16,8"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Video Metadata Info Card -->
+                <Border Background="#F0F9FF" BorderBrush="#BAE6FD" BorderThickness="1" CornerRadius="8"
+                        Padding="16" IsVisible="{Binding HasMetadata}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="📋 Video Bilgileri" FontWeight="SemiBold" FontSize="14" Foreground="#0369A1"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Başlık:" FontWeight="Bold" Width="70" Foreground="#0284C7"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding VideoTitle}" TextWrapping="Wrap" FontWeight="Medium"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Kanal:" FontWeight="Bold" Width="70" Foreground="#0284C7" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding VideoChannel}" Margin="0,4,0,0"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Süre:" FontWeight="Bold" Width="70" Foreground="#0284C7" Margin="0,4,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding VideoDuration}" Margin="0,4,0,0"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Options & Quality Section -->
+                <Border Background="#F9FAFB" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="İndirme Kalitesi ve Formatı:" FontWeight="Medium" FontSize="13"/>
+                        <ComboBox ItemsSource="{Binding AvailableFormats}"
+                                  SelectedItem="{Binding SelectedFormat}"
+                                  HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:FormatOption">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="{Binding Label}" FontWeight="Medium"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding FormattedSize}" Foreground="Gray" Margin="16,0,0,0"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+
+                        <TextBlock Text="Kayıt Klasörü:" FontWeight="Medium" FontSize="13" Margin="0,4,0,0"/>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Grid.Column="0" Text="{Binding DownloadDirectory}" IsReadOnly="True" Margin="0,0,8,0" Padding="8,6"/>
+                            <Button Grid.Column="1" Content="📁 Gözat..." Click="OnBrowseFolderClicked" Padding="12,6"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Progress Section -->
+                <Border Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="İlerleme Durumu" FontWeight="Medium" FontSize="13"/>
+                            <TextBlock Grid.Column="1" Text="{Binding ProgressPercentText}" FontWeight="Bold" FontSize="14" Foreground="#0066CC"/>
+                        </Grid>
+
+                        <ProgressBar Value="{Binding ProgressPercentage}" Minimum="0" Maximum="100" Height="14" CornerRadius="7"/>
+
+                        <TextBlock Text="{Binding ProgressDetails}" FontSize="12" Foreground="Gray" HorizontalAlignment="Right"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Actions -->
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                    <Button Grid.Column="0"
+                            Content="⬇️ İndirmeyi Başlat"
+                            Command="{Binding DownloadCommand}"
+                            IsEnabled="{Binding !IsDownloading}"
+                            Background="#107C41" Foreground="White"
+                            FontWeight="Bold" FontSize="14" Padding="20,10" Margin="0,0,8,0"/>
+
+                    <Button Grid.Column="1"
+                            Content="⏹ İptal Et"
+                            Command="{Binding CancelDownloadCommand}"
+                            IsEnabled="{Binding CanCancel}"
+                            Background="#D83B01" Foreground="White"
+                            FontWeight="Medium" FontSize="13" Padding="14,10"/>
+
+                    <Button Grid.Column="3"
+                            Content="🎬 Dosyayı Aç"
+                            Command="{Binding OpenFileCommand}"
+                            IsEnabled="{Binding CanOpenFile}"
+                            FontSize="13" Padding="12,10" Margin="0,0,8,0"/>
+
+                    <Button Grid.Column="4"
+                            Content="📂 Klasörü Aç"
+                            Command="{Binding OpenFolderCommand}"
+                            FontSize="13" Padding="12,10"/>
+                </Grid>
+
+                <!-- Status Bar -->
+                <Border Background="#F3F4F6" CornerRadius="6" Padding="12,8">
+                    <TextBlock Text="{Binding StatusMessage}" FontSize="12" Foreground="#374151" TextWrapping="Wrap"/>
+                </Border>
+
+            </StackPanel>
+        </Border>
+    </ScrollViewer>
+</Window>

@@ -1,0 +1,28 @@
+﻿{
+    "version":  "2.1.0",
+    "releaseDate":  "2026-10-26",
+    "mandatory":  false,
+    "changelogUrl":  "https://github.com/Hakantes/videodw/releases/tag/v2.1.0",
+    "releaseNotes":  "• Apple Silicon macOS (ARM64) yerel masaüstü uygulaması eklendi.\n• Windows ve macOS için güvenli kriptografik otomatik güncelleme sistemi.\n• Gerçek zamanlı indirme ilerlemesi, hız göstergesi ve önceden dosya boyutu tahmini.\n• Windows Media Player ve QuickTime ile %100 uyumlu H.264/AAC profili.",
+    "packages":  {
+                     "windows-setup":  {
+                                           "fileName":  "VideoDownloader-Setup.exe",
+                                           "url":  "https://github.com/Hakantes/videodw/releases/download/v2.1.0/VideoDownloader-Setup.exe",
+                                           "size":  115271500,
+                                           "sha256":  "d14896f1a55f144be533fa9be790e27e7baaac8d5faa1a164664ad8f03d4df74"
+                                       },
+                     "windows-portable":  {
+                                              "fileName":  "YouTubeDownloader_v2.1.0_Windows.zip",
+                                              "url":  "https://github.com/Hakantes/videodw/releases/download/v2.1.0/YouTubeDownloader_v2.1.0_Windows.zip",
+                                              "size":  150975530,
+                                              "sha256":  "69c2859cf8c5d00afa76ef6570fe48ac892ed53278516a635658eaf5a8511438"
+                                          },
+                     "macos-arm64":  {
+                                         "fileName":  "YouTubeDownloader_v2.1.0_macOS_ARM64.zip",
+                                         "url":  "https://github.com/Hakantes/videodw/releases/download/v2.1.0/YouTubeDownloader_v2.1.0_macOS_ARM64.zip",
+                                         "size":  39916702,
+                                         "sha256":  "31fabf2a3552f4d8883ef3ba005deef9c81d53184d9affea34c799c5f8841bde"
+                                     }
+                 },
+    "signature":  "VPbSRAsTJES8xbrKMR+jqKRMC09DNGfe8vtbZow2w6TDUZHLBGH3OU15Im5h2kc5+gf+E8uZhoC83WPbaa3b70avtlts5yi9RLQexKxgeb6E5/auR0K8Ad/jiTqfZlKUnlpHoe6N2vDP69ZHO2cN4vRo+w/3u+zsjPNwlSax8TsXxCIVwNLNYDV1lsPNNXhLe9qv6KxdVHGQBKtci/QkgkuRkRHmE11ZccwiwZd3CTXBLaiDDatcHG6zhXKfy0TO1sBBtp14RMBS8iDCk/E2Ei6WQ0UGbY43qFqvZpJA0VuR1Ba9InbJknXM4I3tyli7a+vv961NJXA6Gy8mBMEQ8w=="
+}

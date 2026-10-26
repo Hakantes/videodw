@@ -91,6 +91,7 @@
     <Compile Include="Logger.cs" />
     <Compile Include="Models.cs" />
     <Compile Include="SettingsService.cs" />
+    <Compile Include="UpdateManager.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>

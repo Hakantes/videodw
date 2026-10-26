@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -72,6 +72,12 @@ namespace youtube_dowload
             else
             {
                 lblStatus.Text = "Hazır. Video bağlantısını yapıştırıp 'Analiz Et'e tıklayın.";
+            }
+
+            // Arka planda sessiz otomatik güncelleme denetimi (Günde en fazla 1 kez)
+            if (_settings.CheckForUpdatesOnStartup)
+            {
+                Task.Delay(3000).ContinueWith(_ => CheckAppUpdatesAsync(false), TaskScheduler.Default);
             }
         }
 
@@ -682,7 +688,17 @@ namespace youtube_dowload
             }
         }
 
-        private async void btnUpdateEngine_Click(object sender, EventArgs e)
+        private void btnUpdateEngine_Click(object sender, EventArgs e)
+        {
+            var menu = new ContextMenuStrip();
+            var itemYtDlp = new ToolStripMenuItem("🔄 İndirme Motorunu Güncelle (yt-dlp)", null, async (s, ev) => await UpdateYtDlpEngineAsync());
+            var itemApp = new ToolStripMenuItem("✨ Uygulama Güncellemelerini Denetle...", null, async (s, ev) => await CheckAppUpdatesAsync(manualCheck: true));
+            menu.Items.Add(itemYtDlp);
+            menu.Items.Add(itemApp);
+            menu.Show(btnUpdateEngine, new System.Drawing.Point(0, btnUpdateEngine.Height));
+        }
+
+        private async Task UpdateYtDlpEngineAsync()
         {
             btnUpdateEngine.Enabled = false;
             lblStatus.Text = "İndirme motoru (yt-dlp) güncelleniyor...";
@@ -700,6 +716,153 @@ namespace youtube_dowload
             finally
             {
                 btnUpdateEngine.Enabled = true;
+            }
+        }
+
+        private async Task CheckAppUpdatesAsync(bool manualCheck)
+        {
+            try
+            {
+                if (!manualCheck && !UpdateManager.ShouldCheckAutomatically(_settings))
+                {
+                    return;
+                }
+
+                if (manualCheck)
+                {
+                    if (InvokeRequired)
+                    {
+                        Invoke(new Action(() => { lblStatus.Text = "Uygulama güncellemeleri denetleniyor..."; }));
+                    }
+                    else
+                    {
+                        lblStatus.Text = "Uygulama güncellemeleri denetleniyor...";
+                    }
+                }
+
+                var updater = new UpdateManager();
+                var result = await updater.CheckForUpdatesAsync(isManual: manualCheck);
+
+                _settings.LastUpdateCheckUtc = DateTime.UtcNow;
+                SettingsService.Save(_settings);
+
+                if (InvokeRequired)
+                {
+                    BeginInvoke(new Action(() => ProcessUpdateCheckResult(result, manualCheck)));
+                }
+                else
+                {
+                    ProcessUpdateCheckResult(result, manualCheck);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Güncelleme denetimi genel hatası", ex);
+                if (manualCheck)
+                {
+                    if (InvokeRequired)
+                    {
+                        BeginInvoke(new Action(() => MessageBox.Show("Güncelleme denetlenirken hata oluştu:\n\n" + ex.Message, "Güncelleme Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error)));
+                    }
+                    else
+                    {
+                        MessageBox.Show("Güncelleme denetlenirken hata oluştu:\n\n" + ex.Message, "Güncelleme Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private void ProcessUpdateCheckResult(UpdateCheckResult result, bool manualCheck)
+        {
+            if (result == null) return;
+
+            if (result.IsUpdateAvailable)
+            {
+                string signatureNote = result.IsSignatureVerified
+                    ? "✔ Dijital imza doğrulandı (Güvenli)."
+                    : "⚠ Dijital imza doğrulanamadı (veya imzasız sürüm).";
+
+                string msg = $"YouTube ve Video İndirici'nin yeni bir sürümü mevcut!\n\n" +
+                             $"Mevcut Sürüm: v{result.CurrentVersion}\n" +
+                             $"Yeni Sürüm: v{result.NewVersion}\n" +
+                             $"{signatureNote}\n\n" +
+                             (string.IsNullOrWhiteSpace(result.ReleaseNotes) ? "" : $"Yenilikler:\n{result.ReleaseNotes}\n\n") +
+                             "Şimdi indirmek ve güncellemek istiyor musunuz?";
+
+                var dlg = MessageBox.Show(msg, "Güncelleme Mevcut", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                if (dlg == DialogResult.Yes)
+                {
+                    _ = PerformAppUpdateAsync(result);
+                }
+            }
+            else if (manualCheck)
+            {
+                if (result.IsError)
+                {
+                    MessageBox.Show(result.StatusMessage, "Güncelleme Denetimi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                else
+                {
+                    MessageBox.Show($"Kullandığınız sürüm en güncel sürümdür (v{result.CurrentVersion}).", "Uygulama Güncel", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                lblStatus.Text = "Hazır.";
+            }
+        }
+
+        private async Task PerformAppUpdateAsync(UpdateCheckResult checkResult)
+        {
+            SetUiState(isDownloading: true);
+            lblStatus.Text = $"Güncelleme indiriliyor: v{checkResult.NewVersion}...";
+            progressBar1.Style = ProgressBarStyle.Blocks;
+            progressBar1.Value = 0;
+            lblProgressPercent.Text = "%0";
+
+            var progress = new Progress<double>(pct =>
+            {
+                if (InvokeRequired)
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        int pVal = Math.Min(100, Math.Max(0, (int)Math.Round(pct)));
+                        progressBar1.Style = ProgressBarStyle.Blocks;
+                        progressBar1.Value = pVal;
+                        lblProgressPercent.Text = $"%{pVal}";
+                        lblProgressDetails.Text = $"Güncelleme paketi indiriliyor... %{pVal}";
+                    }));
+                }
+                else
+                {
+                    int pVal = Math.Min(100, Math.Max(0, (int)Math.Round(pct)));
+                    progressBar1.Style = ProgressBarStyle.Blocks;
+                    progressBar1.Value = pVal;
+                    lblProgressPercent.Text = $"%{pVal}";
+                    lblProgressDetails.Text = $"Güncelleme paketi indiriliyor... %{pVal}";
+                }
+            });
+
+            try
+            {
+                var updater = new UpdateManager(checkResult.CurrentVersion);
+                string downloadedFile = await updater.DownloadUpdateAsync(checkResult, progress, CancellationToken.None);
+
+                lblStatus.Text = "Güncelleme dosyası doğrulandı, kuruluma hazırlanıyor...";
+                var applyDlg = MessageBox.Show("Güncelleme paketi başarıyla indirildi ve doğrulandı.\n\nGüncellemeyi uygulamak için uygulama kapatılacak. Devam etmek istiyor musunuz?", "Güncelleme Hazır", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                if (applyDlg == DialogResult.Yes)
+                {
+                    UpdateManager.ApplyUpdate(downloadedFile, checkResult.InstallType);
+                }
+                else
+                {
+                    lblStatus.Text = "Güncelleme kurulumu kullanıcı tarafından ertelendi.";
+                    SetUiState(isDownloading: false);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Güncelleme indirme/uygulama hatası", ex);
+                MessageBox.Show("Güncelleme indirilemedi veya uygulanamadı:\n\n" + ex.Message, "Güncelleme Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                lblStatus.Text = "Güncelleme başarısız.";
+                SetUiState(isDownloading: false);
             }
         }
 

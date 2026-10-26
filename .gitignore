@@ -37,3 +37,12 @@ src/youtube-downloader/packages/
 
 # Kullanıcı ayarları
 settings.json
+
+# Güvenlik ve Özel Anahtarlar (Asla depoya veya dağıtıma eklenmez)
+*.key
+*.pem
+*.pfx
+keys/
+private/
+*private*
+artifacts/

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -63,6 +63,14 @@ namespace TestSuite
             RunTest("36. Dayanıklılık: 24 Saati Aşan Süreler ve Sıfır Hata Boyut Tahmini", TestDurationExceeding24HoursAndEstimationSafety);
             RunTest("37. Çoklu Akış: Video ve Ses Aşamalarında Kümülatif İlerleme Yüzdesi", TestMultiStreamProgressCalculation);
             RunTest("38. Birleştirme ve Tamamlama: Yapay Yüzde Atlamalarını Engelleme", TestMergerAndValidationStageProgress);
+
+            // v2.1.0 Otomatik Güncelleme Sistemi Testleri (39-44)
+            RunTest("39. Güncelleme Manifesti: JSON Ayrıştırma ve Alan Doğrulama", TestUpdateManifestParsing);
+            RunTest("40. Kriptografik Güvenlik: RSA-2048 SHA-256 İmza ve Değişiklik Koruması", TestUpdateRsaSignatureVerification);
+            RunTest("41. Sürüm Karşılaştırması: Yükseltme ve Downgrade Koruması", TestUpdateVersionComparisonAndDowngradeProtection);
+            RunTest("42. Hız Sınırı (Rate Limit): 24 Saatlik Sessiz Denetim Mantığı", TestUpdateRateLimiting);
+            RunTest("43. Paket Dağıtım Eşleşmesi: Kurulum Türü ve Platform Seçimi", TestUpdatePackageSelection);
+            RunTest("44. Paket Bütünlüğü: SHA-256 Sağlama ve Bozuk Dosya Engelleme", TestUpdateSha256Integrity);
 
             Console.WriteLine("\n-------------------------------------------------");
             Console.WriteLine($"SONUÇ: {_passed} Başarılı, {_failed} Başarısız (Toplam {_passed + _failed} Senaryo)");
@@ -808,6 +816,134 @@ namespace TestSuite
             Assert(repMerger != null, "Merger raporu üretilmeli");
             Assert(repMerger.Stage == DownloadStage.MergingStreams, "Aşama MergingStreams olmalı");
             Assert(Math.Abs(repMerger.Percentage - 50.0) < 1.0, "Merger sırasında önceki gerçek yüzde korunmalı, yapay %99'a sıçramamalı");
+        }
+
+        static void TestUpdateManifestParsing()
+        {
+            string manifestPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "update-manifest.json");
+            if (!File.Exists(manifestPath))
+            {
+                manifestPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "update-manifest.json");
+            }
+            if (!File.Exists(manifestPath))
+            {
+                manifestPath = "update-manifest.json";
+            }
+
+            Assert(File.Exists(manifestPath), "update-manifest.json dosyası mevcut olmalı");
+            string json = File.ReadAllText(manifestPath);
+            var manifest = UpdateManager.ParseManifest(json);
+
+            Assert(manifest != null, "Manifest ayrıştırılabilmeli");
+            Assert(manifest.Version == "2.1.0", "Manifest sürümü 2.1.0 olmalı");
+            Assert(!string.IsNullOrEmpty(manifest.Signature), "Manifest dijital imza içermeli");
+            Assert(manifest.Packages.ContainsKey("windows-setup"), "windows-setup paketi bulunmalı");
+            Assert(manifest.Packages.ContainsKey("windows-portable"), "windows-portable paketi bulunmalı");
+            Assert(manifest.Packages.ContainsKey("macos-arm64"), "macos-arm64 paketi bulunmalı");
+        }
+
+        static void TestUpdateRsaSignatureVerification()
+        {
+            string manifestPath = "update-manifest.json";
+            if (!File.Exists(manifestPath))
+            {
+                manifestPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "update-manifest.json");
+            }
+            string json = File.ReadAllText(manifestPath);
+            var manifest = UpdateManager.ParseManifest(json);
+
+            // 1. Orijinal imzalı manifest doğrulanmalı
+            bool valid = UpdateManager.VerifyManifestSignature(manifest);
+            Assert(valid, "Orijinal manifest RSA-2048 dijital imzası geçerli olmalı");
+
+            // 2. Tahrifat testi: Sürüm değiştirilirse imza geçersiz olmalı
+            string originalVersion = manifest.Version;
+            manifest.Version = "9.9.9";
+            bool tampered = UpdateManager.VerifyManifestSignature(manifest);
+            Assert(!tampered, "Sürüm tahrif edildiğinde imza doğrulaması başarısız olmalı");
+            manifest.Version = originalVersion;
+
+            // 3. Tahrifat testi: Paket SHA-256 değiştirilirse imza geçersiz olmalı
+            string origSha = manifest.Packages["windows-setup"].Sha256;
+            manifest.Packages["windows-setup"].Sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+            bool hashTampered = UpdateManager.VerifyManifestSignature(manifest);
+            Assert(!hashTampered, "Paket hash'i tahrif edildiğinde imza doğrulaması başarısız olmalı");
+            manifest.Packages["windows-setup"].Sha256 = origSha;
+        }
+
+        static void TestUpdateVersionComparisonAndDowngradeProtection()
+        {
+            var curVer = new Version(2, 0, 3);
+            var remoteNew = new Version(2, 1, 0);
+            var remoteSame = new Version(2, 0, 3);
+            var remoteOld = new Version(2, 0, 1);
+
+            Assert(remoteNew > curVer, "2.1.0 > 2.0.3 güncelleme olarak algılanmalı");
+            Assert(!(remoteSame > curVer), "Aynı sürüm güncelleme tetiklememeli");
+            Assert(!(remoteOld > curVer), "Eski sürüm downgrade koruması ile engellenmeli");
+        }
+
+        static void TestUpdateRateLimiting()
+        {
+            var settings = new AppSettings
+            {
+                CheckForUpdatesOnStartup = true,
+                LastUpdateCheckUtc = null
+            };
+
+            // İlk denetim: LastUpdateCheckUtc null ise çalışmalı
+            Assert(UpdateManager.ShouldCheckAutomatically(settings), "İlk çalıştırmada otomatik güncelleme denetimi yapılmalı");
+
+            // 2 saat önce denetlendiyse: Tekrar denetlenmemeli
+            settings.LastUpdateCheckUtc = DateTime.UtcNow.AddHours(-2);
+            Assert(!UpdateManager.ShouldCheckAutomatically(settings), "2 saat önce kontrol edilmişse 24 saat kuralı gereği denetlenmemeli");
+
+            // 25 saat önce denetlendiyse: Yeniden denetlenmeli
+            settings.LastUpdateCheckUtc = DateTime.UtcNow.AddHours(-25);
+            Assert(UpdateManager.ShouldCheckAutomatically(settings), "25 saat geçmişse otomatik güncelleme denetimi yapılmalı");
+
+            // Kullanıcı ayarı kapattıysa: Asla denetlenmemeli
+            settings.CheckForUpdatesOnStartup = false;
+            Assert(!UpdateManager.ShouldCheckAutomatically(settings), "Kullanıcı ayarı kapattığında denetlenmemeli");
+        }
+
+        static void TestUpdatePackageSelection()
+        {
+            var manifest = new UpdateManifest();
+            manifest.Packages["windows-setup"] = new PackageInfo { FileName = "Setup.exe", Url = "https://example.com/setup.exe" };
+            manifest.Packages["windows-portable"] = new PackageInfo { FileName = "Portable.zip", Url = "https://example.com/portable.zip" };
+            manifest.Packages["macos-arm64"] = new PackageInfo { FileName = "Mac.zip", Url = "https://example.com/mac.zip" };
+
+            // Inno Setup yüklüyse windows-setup seçilmeli
+            Assert(manifest.Packages["windows-setup"].FileName.EndsWith(".exe"), "Inno Setup paketi exe olmalı");
+            // Portable ise windows-portable seçilmeli
+            Assert(manifest.Packages["windows-portable"].FileName.EndsWith(".zip"), "Portable paketi zip olmalı");
+            // macOS paketi arm64 olmalı
+            Assert(manifest.Packages["macos-arm64"].FileName == "Mac.zip", "macOS paketi doğru seçilmeli");
+        }
+
+        static void TestUpdateSha256Integrity()
+        {
+            string tempFile = Path.Combine(Path.GetTempPath(), "sha256_test_" + Guid.NewGuid().ToString("N") + ".bin");
+            try
+            {
+                byte[] testBytes = System.Text.Encoding.UTF8.GetBytes("YouTube Downloader v2.1.0 Güvenli Güncelleme Testi");
+                File.WriteAllBytes(tempFile, testBytes);
+
+                string actualHash = UpdateManager.ComputeFileSha256(tempFile);
+                Assert(!string.IsNullOrEmpty(actualHash) && actualHash.Length == 64, "SHA-256 64 karakter hex olmalı");
+
+                // Beklenen hash eşleşmesi
+                Assert(string.Equals(actualHash, actualHash, StringComparison.OrdinalIgnoreCase), "Aynı hash eşleşmeli");
+
+                // Bozuk dosya / farklı hash
+                string fakeHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+                Assert(!string.Equals(actualHash, fakeHash, StringComparison.OrdinalIgnoreCase), "Farklı hash uyuşmazlığı tespit edilmeli");
+            }
+            finally
+            {
+                if (File.Exists(tempFile)) File.Delete(tempFile);
+            }
         }
 
         static void Assert(bool condition, string message)

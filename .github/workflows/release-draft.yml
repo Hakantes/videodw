@@ -1,0 +1,111 @@
+﻿name: Release Draft (Windows + macOS ARM64)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Sürüm numarası (örn. 2.1.0)'
+        required: true
+        default: '2.1.0'
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    name: Windows (.NET 4.8.1 WinForms) Derleme ve Paketleme
+    runs-on: windows-latest
+    steps:
+      - name: Kodu Klonla
+        uses: actions/checkout@v4
+
+      - name: MSBuild Kurulumu
+        uses: microsoft/setup-msbuild@v2
+
+      - name: NuGet Paketlerini Geri Yükle
+        run: nuget restore "src/youtube-downloader/packages.config" -SolutionDirectory .
+
+      - name: Inno Setup Kurulumu
+        run: choco install innosetup --no-progress
+
+      - name: Windows Release Derle
+        run: msbuild "src/youtube-downloader/youtube dowload.csproj" /p:Configuration=Release /t:Rebuild
+
+      - name: Windows Dağıtım Paketlerini Oluştur (ZIP & Inno Setup)
+        shell: powershell
+        run: |
+          $ver = "${{ github.event.inputs.version || github.ref_name }}".TrimStart('v')
+          # Inno Setup derle
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="$ver" installer.iss
+
+          # Portable ZIP oluştur
+          $portDir = "YouTubeDownloader_v${ver}_Windows"
+          New-Item -ItemType Directory -Path $portDir -Force
+          Copy-Item "src\youtube-downloader\bin\Release\*" -Destination $portDir -Recurse -Exclude *.pdb
+          Compress-Archive -Path "$portDir\*" -DestinationPath "$portDir.zip" -Force
+
+      - name: Windows Çıktılarını Yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: |
+            Output/VideoDownloader-Setup.exe
+            YouTubeDownloader_*_Windows.zip
+
+  build-macos:
+    name: macOS Apple Silicon (.NET 8 Avalonia ARM64) Derleme
+    runs-on: macos-14
+    steps:
+      - name: Kodu Klonla
+        uses: actions/checkout@v4
+
+      - name: .NET 8 SDK Kurulumu
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: macOS .app ve ZIP Paketini Oluştur
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          chmod +x scripts/build-macos-app.sh
+          ./scripts/build-macos-app.sh "${VERSION}" Release
+
+      - name: macOS Çıktılarını Yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: artifacts/YouTubeDownloader_*_macOS_ARM64.zip
+
+  create-draft-release:
+    name: GitHub Releases Taslak (Draft) Oluştur
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodu Klonla
+        uses: actions/checkout@v4
+
+      - name: Tüm Paketleri İndir
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Sağlama Özetleri (SHA-256) ve Manifest Hazırla
+        run: |
+          mkdir -p final-dist
+          find release-assets/ -type f \( -name "*.exe" -o -name "*.zip" \) -exec cp {} final-dist/ \;
+          cd final-dist
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: GitHub Release Taslağını (Draft) Yayımla
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: false
+          name: "YouTube ve Video İndirici v${{ github.event.inputs.version || github.ref_name }}"
+          files: |
+            final-dist/*
+            update-manifest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

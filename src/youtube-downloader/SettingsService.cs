@@ -12,6 +12,9 @@ namespace youtube_dowload
         public string BrowserForCookies { get; set; } = "Yok";
         public string LastProfile { get; set; } = "WindowsCompatible";
         public bool AutoReencodeIfH264Missing { get; set; } = false;
+        public bool CheckForUpdatesOnStartup { get; set; } = true;
+        public DateTime? LastUpdateCheckUtc { get; set; } = null;
+        public string UpdateChannel { get; set; } = "stable";
     }
 
     public static class SettingsService
@@ -63,7 +66,10 @@ namespace youtube_dowload
                 IsAudioOnly = false,
                 BrowserForCookies = "Yok",
                 LastProfile = "WindowsCompatible",
-                AutoReencodeIfH264Missing = false
+                AutoReencodeIfH264Missing = false,
+                CheckForUpdatesOnStartup = true,
+                LastUpdateCheckUtc = null,
+                UpdateChannel = "stable"
             };
         }
 
