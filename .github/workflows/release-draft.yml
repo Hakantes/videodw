@@ -1,4 +1,4 @@
-﻿name: Release Draft (Windows + macOS ARM64)
+name: Release Draft (Windows + macOS ARM64)
 
 on:
   workflow_dispatch:
@@ -35,10 +35,7 @@ jobs:
         shell: powershell
         run: |
           $ver = "${{ github.event.inputs.version || github.ref_name }}".TrimStart('v')
-          # Inno Setup derle
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="$ver" installer.iss
-
-          # Portable ZIP oluştur
           $portDir = "YouTubeDownloader_v${ver}_Windows"
           New-Item -ItemType Directory -Path $portDir -Force
           Copy-Item "src\youtube-downloader\bin\Release\*" -Destination $portDir -Recurse -Exclude *.pdb
@@ -64,18 +61,20 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: macOS .app ve ZIP Paketini Oluştur
+      - name: macOS .app, ZIP ve DMG Paketini Oluştur
         run: |
           VERSION="${{ github.event.inputs.version || github.ref_name }}"
           VERSION="${VERSION#v}"
-          chmod +x scripts/build-macos-app.sh
+          chmod +x scripts/*.sh
           ./scripts/build-macos-app.sh "${VERSION}" Release
 
       - name: macOS Çıktılarını Yükle
         uses: actions/upload-artifact@v4
         with:
           name: macos-artifacts
-          path: artifacts/YouTubeDownloader_*_macOS_ARM64.zip
+          path: |
+            artifacts/YouTubeDownloader_*_macOS_ARM64.zip
+            artifacts/YouTubeDownloader_*_macOS_ARM64.dmg
 
   create-draft-release:
     name: GitHub Releases Taslak (Draft) Oluştur
@@ -93,7 +92,7 @@ jobs:
       - name: Sağlama Özetleri (SHA-256) ve Manifest Hazırla
         run: |
           mkdir -p final-dist
-          find release-assets/ -type f \( -name "*.exe" -o -name "*.zip" \) -exec cp {} final-dist/ \;
+          find release-assets/ -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.dmg" \) -exec cp {} final-dist/ \;
           cd final-dist
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt

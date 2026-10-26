@@ -13,7 +13,6 @@ PROJECT_PATH="${ROOT_DIR}/src/macos-downloader/YouTubeDownloader.Mac.csproj"
 PUBLISH_DIR="${ROOT_DIR}/artifacts/publish/osx-arm64"
 APP_DIR="${ROOT_DIR}/artifacts/YouTube Downloader.app"
 ZIP_OUTPUT="${ROOT_DIR}/artifacts/YouTubeDownloader_v${VERSION}_macOS_ARM64.zip"
-DMG_OUTPUT="${ROOT_DIR}/artifacts/YouTubeDownloader_v${VERSION}_macOS_ARM64.dmg"
 
 # 1. Publish osx-arm64
 echo "[1/4] Publishing .NET 8 osx-arm64 self-contained single-file..."
@@ -42,13 +41,15 @@ rm -f "${ZIP_OUTPUT}"
 cd "${ROOT_DIR}/artifacts"
 zip -r -q "${ZIP_OUTPUT}" "YouTube Downloader.app"
 
-# 4. Optional DMG creation on macOS
+# 4. Optional DMG creation on macOS (with Applications shortcut)
 if command -v hdiutil &>/dev/null; then
-    echo "Creating DMG image..."
-    rm -f "${DMG_OUTPUT}"
-    hdiutil create -volname "YouTube Downloader" -srcfolder "${APP_DIR}" -ov -format UDZO "${DMG_OUTPUT}"
-    shasum -a 256 "${DMG_OUTPUT}"
+    echo "[4/4] Creating DMG with /Applications drag-and-drop shortcut..."
+    "${SCRIPT_DIR}/create-dmg.sh" "${VERSION}"
+else
+    echo "[4/4] 'hdiutil' not available in this environment. DMG creation skipped (requires macOS)."
 fi
 
-shasum -a 256 "${ZIP_OUTPUT}"
+echo ""
+echo "ZIP Hash (SHA-256):"
+shasum -a 256 "${ZIP_OUTPUT}" || sha256sum "${ZIP_OUTPUT}"
 echo "Build completed successfully!"
