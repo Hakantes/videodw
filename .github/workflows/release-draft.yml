@@ -22,23 +22,35 @@ jobs:
       - name: MSBuild Kurulumu
         uses: microsoft/setup-msbuild@v2
 
+      - name: NuGet Kurulumu
+        uses: NuGet/setup-nuget@v2
+
       - name: NuGet Paketlerini Geri Yükle
-        run: nuget restore "src/youtube-downloader/packages.config" -SolutionDirectory .
+        run: nuget restore "src/youtube-downloader/youtube dowload.sln"
 
       - name: Inno Setup Kurulumu
         run: choco install innosetup --no-progress
 
       - name: Windows Release Derle
-        run: msbuild "src/youtube-downloader/youtube dowload.csproj" /p:Configuration=Release /t:Rebuild
+        run: msbuild "src/youtube-downloader/youtube dowload.sln" /p:Configuration=Release /p:Platform="Any CPU"
 
       - name: Windows Dağıtım Paketlerini Oluştur (ZIP & Inno Setup)
         shell: powershell
         run: |
           $ver = "${{ github.event.inputs.version || github.ref_name }}".TrimStart('v')
+          $binDir = "src\youtube-downloader\bin\Release"
+
+          # Inno Setup için Publish klasörünü hazırla
+          New-Item -ItemType Directory -Path "Publish" -Force
+          Copy-Item "$binDir\*" -Destination "Publish" -Recurse -Exclude *.pdb
+
+          # Inno Setup ile kurulum programını derle
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion="$ver" installer.iss
+
+          # Taşınabilir (Portable) ZIP paketini oluştur
           $portDir = "YouTubeDownloader_v${ver}_Windows"
           New-Item -ItemType Directory -Path $portDir -Force
-          Copy-Item "src\youtube-downloader\bin\Release\*" -Destination $portDir -Recurse -Exclude *.pdb
+          Copy-Item "$binDir\*" -Destination $portDir -Recurse -Exclude *.pdb
           Compress-Archive -Path "$portDir\*" -DestinationPath "$portDir.zip" -Force
 
       - name: Windows Çıktılarını Yükle
@@ -46,7 +58,7 @@ jobs:
         with:
           name: windows-artifacts
           path: |
-            Output/VideoDownloader-Setup.exe
+            VideoDownloader-Setup.exe
             YouTubeDownloader_*_Windows.zip
 
   build-macos:
