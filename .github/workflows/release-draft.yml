@@ -92,6 +92,8 @@ jobs:
     name: GitHub Releases Taslak (Draft) Oluştur
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Kodu Klonla
         uses: actions/checkout@v4
@@ -112,9 +114,10 @@ jobs:
       - name: GitHub Release Taslağını (Draft) Yayımla
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.version != '' && (startsWith(github.event.inputs.version, 'v') && github.event.inputs.version || format('v{0}', github.event.inputs.version)) || (startsWith(github.ref_name, 'v') && github.ref_name || 'v2.1.0') }}
           draft: true
           prerelease: false
-          name: "YouTube ve Video İndirici v${{ github.event.inputs.version || github.ref_name }}"
+          name: "YouTube ve Video İndirici ${{ github.event.inputs.version != '' && (startsWith(github.event.inputs.version, 'v') && github.event.inputs.version || format('v{0}', github.event.inputs.version)) || (startsWith(github.ref_name, 'v') && github.ref_name || 'v2.1.0') }}"
           files: |
             final-dist/*
             update-manifest.json
