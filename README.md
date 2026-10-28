@@ -1,161 +1,117 @@
-# 🎬 YouTube ve Video İndirici v2.1.0
+# YouTube Downloader
 
 [![Release](https://img.shields.io/badge/Release-v2.1.0-blue.svg)](https://github.com/Hakantes/videodw/releases)
 [![Platform Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11%20(x64)-0078D6.svg)](https://github.com/Hakantes/videodw/releases)
 [![Platform macOS](https://img.shields.io/badge/Platform-macOS%20Apple%20Silicon%20(ARM64)-000000.svg)](https://github.com/Hakantes/videodw/releases)
-[![License](https://img.shields.io/badge/License-GPLv3%20%2F%20Open%20Source-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-GPLv3-green.svg)](LICENSE)
 
-Windows (.NET Framework 4.8.1 WinForms) ve macOS Apple Silicon (.NET 8 Avalonia UI) için geliştirilmiş; **yt-dlp**, **FFmpeg** ve **ffprobe** destekli, canlı indirme ilerlemesi, anlık hız ve kalan süre (ETA) göstergeli, indirme öncesi dosya boyutu tahmini yapabilen, **H.264/AAC** uyumlu ve güvenli **RSA-2048** otomatik güncelleme mimarisine sahip masaüstü video ve ses indirici.
+YouTube Downloader, Windows ve macOS için geliştirilmiş açık kaynaklı bir video ve ses indirme uygulamasıdır. Arka planda `yt-dlp` ve `FFmpeg` motorlarını kullanarak yüksek çözünürlüklü video indirme, ses dönüştürme ve format uyumluluğu sağlar.
 
 ---
 
-## 📥 İndirme Bağlantıları (Downloads)
+## Özellikler
 
-Uygulamanın derlemelerini aşağıdaki resmi bağlantılardan indirebilirsiniz:
+- **Çoklu Çözünürlük ve Format:** 4K, 2K, 1080p, 720p ve 480p video indirme; 320 kbps yüksek kaliteli MP3 ses ayıklama.
+- **Evrensel Oynatma Uyumluluğu:** Windows Media Player ve QuickTime ile sorunsuz çalışan H.264 video ve AAC ses birleştirme profili.
+- **Canlı İndirme Göstergeleri:** Gerçek zamanlı ilerleme yüzdesi, anlık transfer hızı ve tahmini kalan süre (ETA).
+- **İndirme Öncesi Boyut Tahmini:** Seçilen kaliteye göre tahmini dosya boyutunu indirme başlamadan görüntüleme.
+- **Medya Doğrulaması:** İndirilen dosyaların bütünlüğünü `ffprobe` ile doğrulama.
+- **Otomatik Güncelleme:** RSA-2048 imzalı manifest ve SHA-256 özet denetimi ile güvenli sürüm kontrolü.
 
-> **⚠️ Dağıtım ve Yayın Notu:** Aşağıdaki doğrudan indirme bağlantıları, GitHub Releases sayfasında resmi `v2.1.0` sürümü yayımlandığında (veya taslak release onaylandığında) aktifleşecektir. Şu anda yerel ortamda üretilmiş ve doğrulanmış dağıtım dosyaları projenin `artifacts/` klasöründe yer almaktadır. Tüm geçmiş ve güncel sürümler için her zaman [GitHub Releases](https://github.com/Hakantes/videodw/releases) sayfasını ziyaret edebilirsiniz.
+---
 
-| Platform | Dağıtım Türü | Dosya Adı | Açıklama | GitHub Release Bağlantısı |
+## İndirme Bağlantıları
+
+> **Not:** v2.1.0 sürümü GitHub üzerinde taslak olarak hazır durumdadır. İndirme bağlantıları sürüm yayımlandığında etkinleşir. Tüm sürümler için [GitHub Releases](https://github.com/Hakantes/videodw/releases) sayfasını inceleyebilirsiniz.
+
+| Platform | Format | Dosya | Açıklama | İndir |
 | :--- | :--- | :--- | :--- | :---: |
-| 🪟 **Windows** | **Kurulum Sihirbazı (Önerilen)** | `VideoDownloader-Setup.exe` | Tam kurulum; masaüstü kısayolu, yt-dlp & FFmpeg dahil | [İndir (Setup)](https://github.com/Hakantes/videodw/releases/download/v2.1.0/VideoDownloader-Setup.exe) |
-| 🪟 **Windows** | **Taşınabilir (Portable ZIP)** | `YouTubeDownloader_v2.1.0_Windows.zip` | Kurulumsuz; USB bellekte veya klasörde doğrudan çalışır | [İndir (ZIP)](https://github.com/Hakantes/videodw/releases/download/v2.1.0/YouTubeDownloader_v2.1.0_Windows.zip) |
-| 🍏 **macOS** | **Taşınabilir Arşiv (ZIP - Hazır)** | `YouTubeDownloader_v2.1.0_macOS_ARM64.zip` | Apple Silicon (M1/M2/M3/M4); yerel `.app` bundle | [İndir (ZIP)](https://github.com/Hakantes/videodw/releases/download/v2.1.0/YouTubeDownloader_v2.1.0_macOS_ARM64.zip) |
-| 🍏 **macOS** | **Kolay Kurulum İmajı (DMG)** | `YouTubeDownloader_v2.1.0_macOS_ARM64.dmg` | Uygulamalar klasörüne sürükle-bırak *(Bu Release'e daha sonra eklenecektir)* | *(Yakında Eklenecek)* |
+| **Windows** | Setup (Önerilen) | `VideoDownloader-Setup.exe` | Kurulum sihirbazı; masaüstü kısayolu, yt-dlp ve FFmpeg dahildir | [İndir](https://github.com/Hakantes/videodw/releases/download/v2.1.0/VideoDownloader-Setup.exe) |
+| **Windows** | Portable ZIP | `YouTubeDownloader_v2.1.0_Windows.zip` | Kurulum gerektirmez, doğrudan çalıştırılabilir | [İndir](https://github.com/Hakantes/videodw/releases/download/v2.1.0/YouTubeDownloader_v2.1.0_Windows.zip) |
+| **macOS** | DMG (Önerilen) | `YouTubeDownloader_v2.1.0_macOS_ARM64.dmg` | Apple Silicon (M1/M2/M3/M4); sürükle-bırak kurulum | [İndir](https://github.com/Hakantes/videodw/releases/download/v2.1.0/YouTubeDownloader_v2.1.0_macOS_ARM64.dmg) |
+| **macOS** | Portable ZIP | `YouTubeDownloader_v2.1.0_macOS_ARM64.zip` | Apple Silicon (M1/M2/M3/M4); `.app` paketi | [İndir](https://github.com/Hakantes/videodw/releases/download/v2.1.0/YouTubeDownloader_v2.1.0_macOS_ARM64.zip) |
+
+### Dosya Bütünlüğü (SHA-256)
+
+| Dosya Adı | Boyut (Bayt) | SHA-256 Özeti |
+| :--- | :--- | :--- |
+| `VideoDownloader-Setup.exe` | 115.271.500 | `d14896f1a55f144be533fa9be790e27e7baaac8d5faa1a164664ad8f03d4df74` |
+| `YouTubeDownloader_v2.1.0_Windows.zip` | 150.975.530 | `69c2859cf8c5d00afa76ef6570fe48ac892ed53278516a635658eaf5a8511438` |
+| `YouTubeDownloader_v2.1.0_macOS_ARM64.dmg` | 45.741.596 | `6ac5abddbc1f07ae3924573d3fc403f9aaf90001d1ed3109f61df54a5d06bc82` |
+| `YouTubeDownloader_v2.1.0_macOS_ARM64.zip` | 39.916.702 | `31fabf2a3552f4d8883ef3ba005deef9c81d53184d9affea34c799c5f8841bde` |
 
 ---
 
-## 🔒 Dosya Bütünlüğü ve Güvenlik (SHA-256 Checksums)
+## Kurulum
 
-Yerel derlemede üretilmiş ve doğrulanmış paketlerin SHA-256 sağlama özetleri aşağıdadır:
+### Windows
+- **Kurulum Sihirbazı:** `VideoDownloader-Setup.exe` dosyasını çalıştırıp adımları tamamlayın. `yt-dlp` ve `FFmpeg` pakete dahil olduğundan ek bir yazılım kurmanız gerekmez.
+- **Taşınabilir Sürüm:** `YouTubeDownloader_v2.1.0_Windows.zip` dosyasını çıkartın ve `youtube dowload.exe` uygulamasını çalıştırın.
 
-| Dosya Adı | Boyut (Bayt) | SHA-256 Sağlama Özeti | Durum |
-| :--- | :--- | :--- | :---: |
-| **`VideoDownloader-Setup.exe`** | 115.271.500 | `d14896f1a55f144be533fa9be790e27e7baaac8d5faa1a164664ad8f03d4df74` | Doğrulandı |
-| **`YouTubeDownloader_v2.1.0_Windows.zip`** | 150.975.530 | `69c2859cf8c5d00afa76ef6570fe48ac892ed53278516a635658eaf5a8511438` | Doğrulandı |
-| **`YouTubeDownloader_v2.1.0_macOS_ARM64.zip`** | 39.916.702 | `31fabf2a3552f4d8883ef3ba005deef9c81d53184d9affea34c799c5f8841bde` | Doğrulandı |
+### macOS (Apple Silicon M1/M2/M3/M4)
+1. **Kurulum:** `YouTubeDownloader_v2.1.0_macOS_ARM64.dmg` dosyasını açın ve `YouTube Downloader.app` uygulamasını **Applications** klasörüne sürükleyin.
+2. **İlk Açılış İzni:** Açık kaynaklı ve bağımsız bir yazılım olduğundan ilk açılışta macOS güvenlik uyarısı verebilir. Finder'da uygulamaya **Sağ tıklayın (veya Control + Tık)** ve **Aç** seçeneğini seçin; gelen iletişim kutusunda **Aç** butonuna tıklayın.
+3. **Motor Kurulumu:** Terminal uygulamasını açarak indirme araçlarını yükleyin:
+   ```bash
+   brew install yt-dlp ffmpeg
+   ```
+   Ayrıntılı adımlar ve karantina yönetimi için [docs/MACOS_KURULUM.md](docs/MACOS_KURULUM.md) belgesini inceleyebilirsiniz.
 
-> **💡 macOS Paket Notu:** Apple'ın tescilli `hdiutil` aracı yalnızca macOS üzerinde çalıştığından, DMG disk imajı daha sonra oluşturulup aynı Release altına eklenecektir. Şu anda doğrudan kullanıma hazır ve doğrulanmış paket **`YouTubeDownloader_v2.1.0_macOS_ARM64.zip`** (38,07 MB) paketidir. *(Not: macOS ARM64 sürümü çapraz derleme ile paketlenmiştir; fiziksel Mac donanımı üzerinde kurulum ve test süreci devam etmektedir).*
-
----
-
-## 🚀 Kurulum ve Başlangıç
-
-### 🪟 Windows Kurulumu
-1. **Kurulum Sihirbazı İle (Önerilen):**
-   - `VideoDownloader-Setup.exe` dosyasını indirip çalıştırın.
-   - Kurulum sihirbazındaki adımları izleyin (*İleri > Kur*).
-   - Kurulum paketi `yt-dlp`, `FFmpeg` ve `ffprobe` araçlarını otomatik olarak içerir; harici hiçbir yazılım yüklemeniz gerekmez.
-2. **Taşınabilir (Portable) Sürüm İle:**
-   - `YouTubeDownloader_v2.1.0_Windows.zip` arşivini bir klasöre çıkartın.
-   - Klasör içindeki `youtube dowload.exe` dosyasına çift tıklayarak doğrudan kullanın.
-
-### 🍏 macOS Apple Silicon Kurulumu
-1. **DMG veya ZIP Paketini İndirin:**
-   - `YouTubeDownloader_v2.1.0_macOS_ARM64.dmg` dosyasını açıp uygulamayı **Uygulamalar (`Applications`)** klasörüne sürükleyin (veya ZIP arşivini açıp `.app` dosyasını taşıyın).
-2. **İlk Açılışta Gatekeeper İzni:**
-   - Bağımsız açık kaynaklı bir proje olduğundan (Apple'ın \$99/yıl ücretli Developer ID sertifikası yerine güvenli SHA-256 imzası kullanılmaktadır) macOS ilk açılışta *"Geliştirici doğrulanamadı"* uyarısı verir.
-   - **Çözüm (Önerilen):** Finder'da uygulamaya **Control tuşuna basarak tıklayın (Sağ Tık)** ve **Aç (`Open`)** deyin. Çıkan pencerede **Aç** butonuna basın. macOS bu tercihi hatırlar.
-   - *(Detaylı macOS güvenlik rehberi için [docs/MACOS_KURULUM.md](docs/MACOS_KURULUM.md) belgesini inceleyin).*
-3. **Motorları Yükleyin (Homebrew):**
-   - macOS Terminalini açıp şu komutu çalıştırın:
-     ```bash
-     brew install yt-dlp ffmpeg
-     ```
+> **Önemli Not:** macOS ARM64 sürümü çapraz derleme ile oluşturulmuştur ve CI ortamında paketlenmiştir. Fiziksel Apple Silicon cihazda son kullanıcı testi henüz tamamlanmamıştır.
 
 ---
 
-## 🔄 Otomatik Güncelleme Mimarisi (v2.1.0)
+## Kullanım
 
-Uygulama, hem Windows hem de macOS üzerinde modern ve güvenli bir güncelleme sistemi içerir:
-
-- **Arka Plan Denetimi:** Uygulama açılışında günde en fazla 1 kez sessizce `update-manifest.json` dosyasını kontrol eder. Kullanıcıyı gereksiz bildirimlerle rahatsız etmez veya GitHub API sınırını tüketmez.
-- **Manuel Kontrol:** İstenildiği an sağ üst köşedeki *"🔄 Güncellemeleri Denetle"* seçeneğiyle doğrudan sorgulama yapılabilir.
-- **Kriptografik Güvenlik (RSA-2048 + SHA-256):** İndirilen manifest, geliştiricinin özel anahtarıyla imzalanmış ve uygulamaya gömülü RSA-2048 açık anahtarıyla doğrulanır. İmzası geçersiz, sürümü düşürülmüş (downgrade) veya hash'i eşleşmeyen hiçbir paket kuruluma alınmaz.
-- **Platform Yalıtımı:** Windows yalnızca Windows kurulum paketlerini, macOS ise yalnızca Apple Silicon ARM64 paketlerini indirebilir; çapraz paket hataları engellenmiştir.
-- **Ayarların Korunumu:** Windows ayarları `%APPDATA%\YouTubeVideoDownloader\settings.json`, macOS ayarları `~/Library/Application Support/YouTubeVideoDownloader/settings.json` altında saklandığından güncellemelerde hiçbir tercih sıfırlanmaz.
+1. Video veya oynatma listesi bağlantısını URL alanına yapıştırın.
+2. Çözünürlük ve format seçeneğini belirleyin (geniş uyumluluk için H.264 / AAC önerilir).
+3. **İndir** butonuna tıklayın. İndirme ilerlemesi, hızı ve kalan süresi ekranda gösterilir.
 
 ---
 
-## ✨ Temel Özellikler
+## Sistem Gereksinimleri
 
-### 1. 📊 Canlı İlerleme, Anlık Hız ve ETA
-- **Gerçek Zamanlı İlerleme:** Transfer edilen gerçek bayt verilerine göre anlık artan kademeli ilerleme çubuğu (%0 ➔ %12 ➔ %45 ➔ %88 ➔ %100).
-- **Önceden Boyut Tahmini:** Video analiz edildiğinde seçilen çözünürlük ve profile göre tahmini dosya boyutu indirme başlamadan hesaplanır (`~145,6 MB`).
-- **EMA Hız Filtresi:** Ağ dalgalanmalarını yumuşatan Üstel Hareketli Ortalama (EMA) destekli canlı transfer hızı (`8,45 MB/s`).
-- **Tahmini Kalan Süre (ETA):** Sıfıra bölme korumalı anlık kalan süre göstergesi (`Kalan: 00:35`).
-
-### 2. 🎯 Windows Media Player & QuickTime Uyumluluğu
-- **Windows Uyumlu Profil (H.264 / AAC):** YouTube'un yeni nesil AV1 kodeki yerine donanımsal destekli H.264 (`avc1`) video ve AAC (`mp4a`) ses akışlarını birleştirir. Eski bilgisayarlarda, Windows Media Player'da, arabalarda ve televizyonlarda **siyah ekran olmadan** %100 sorunsuz oynatılır.
-- **En İyi Kalite Profili (AV1 / VP9):** 4K/2K çözünürlüklerde kaynakta bulunan en yüksek bit hızına sahip akışları indirir.
-- **Yalnızca Ses (MP3):** Seçilen videoyu doğrudan 320 kbps yüksek kaliteli MP3 dosyasına dönüştürür.
-
-### 3. 🔍 Gerçek Medya Doğrulaması (`ffprobe`)
-- İndirme tamamlandığında dosya sadece uzantısına bakılarak başarılı sayılmaz; entegre `ffprobe` aracıyla video ve ses akışları taranır. Bozuk veya eksik dosyalar anında tespit edilir.
+| Platform | Mimari | Gereksinimler | Durum |
+| :--- | :--- | :--- | :--- |
+| **Windows 10 / 11** | x64 | .NET Framework 4.8.1 (Windows ile gelir) | Destekleniyor |
+| **macOS 11.0+** | Apple Silicon (ARM64) | Homebrew (`yt-dlp`, `ffmpeg`) | Destekleniyor (Donanım testi beklemede) |
+| **macOS (Intel)** | x86_64 | - | Desteklenmiyor |
 
 ---
 
-## 🖥️ Desteklenen Platformlar
+## Sorun Giderme
 
-| İşletim Sistemi | Destek Durumu | Mimari | Gereksinimler |
-| :--- | :---: | :---: | :--- |
-| **Windows 11 / 10** | **Resmi Destek** | x64 / x86 | .NET Framework 4.8.1 (Windows ile hazır gelir) |
-| **macOS Apple Silicon** | **Resmi Destek (MVP)** | ARM64 (M1/M2/M3/M4) | macOS 11.0+, Homebrew (`yt-dlp`, `ffmpeg`) |
-| **macOS Intel (x86_64)** | *Desteklenmiyor* | Intel x64 | Bu sürümde Intel Mac derlemesi bulunmamaktadır |
-
-> **⚠️ Donanım Testi Notu:** macOS ARM64 uygulaması .NET 8 Release ortamında temiz derlenmiş ve test edilmiştir. Arkadaşınızın veya son kullanıcının fiziksel Apple Silicon Mac donanımında ilk çalıştırma testi: **BEKLENİYOR / BLOCKED**.
+| Sorun | Olası Neden | Çözüm |
+| :--- | :--- | :--- |
+| macOS: *"Geliştirici doğrulanamadı"* | Apple Developer imzası bulunmaması | Finder'da uygulamaya sağ tıklayıp **Aç** deyin veya Terminal'de `xattr -cr "/Applications/YouTube Downloader.app"` komutunu çalıştırın. |
+| macOS: *"yt-dlp / FFmpeg bulunamadı"* | Gerekli komut satırı araçlarının kurulu olmaması | Terminal'de `brew install yt-dlp ffmpeg` komutunu çalıştırın. |
+| Windows: Medya oynatıcıda siyah ekran | Videonun AV1 kodekiyle indirilmesi | İndirme menüsünden `H.264 / AAC` uyumlu profili seçin. |
+| Windows SmartScreen uyarısı | Yeni derlenmiş açık kaynak yazılım | "Ek bilgi" bağlantısına ve ardından "Yine de çalıştır" butonuna tıklayın. |
 
 ---
 
-## 🛠️ Kaynak Koddan Derleme (Geliştiriciler İçin)
+## Derleme (Geliştiriciler İçin)
 
-### Windows Uygulamasını Derleme (.NET 4.8.1)
+### Windows (.NET Framework 4.8.1)
 ```powershell
-# NuGet paketlerini geri yükle
 nuget restore "src/youtube-downloader/packages.config" -SolutionDirectory .
-
-# Release derlemesi yap
 msbuild "src/youtube-downloader/youtube dowload.csproj" /p:Configuration=Release /t:Build
-
-# 44 Testten oluşan süiti çalıştır
-csc /target:exe /out:src/youtube-downloader/bin/Release/TestRunner.exe tests/TestRunner.cs /reference:"src/youtube-downloader/bin/Release/youtube dowload.exe","src/youtube-downloader/bin/Release/System.Text.Json.dll"
-./src/youtube-downloader/bin/Release/TestRunner.exe
 ```
 
-### macOS Uygulamasını Derleme ve Paketleme (.NET 8 Avalonia)
+### macOS (.NET 8 / Avalonia UI)
 ```bash
-# macOS üzerinde veya Linux/CI ortamında:
-chmod +x scripts/*.sh
 ./scripts/build-macos-app.sh "2.1.0" Release
-
-# Mac üzerinde DMG oluşturmak için:
 ./scripts/create-dmg.sh "2.1.0"
 ```
 
 ---
 
-## 📋 Sürüm Geçmişi
+## Lisans ve Bağımlılıklar
 
-### v2.1.0
-- 🍏 **macOS Apple Silicon (ARM64) Desteği:** Avalonia UI ve .NET 8 tabanlı yerel masaüstü uygulaması eklendi.
-- 🔄 **Güvenli Otomatik Güncelleme:** RSA-2048 PKCS#1 SHA-256 dijital imzalı ve SHA-256 paket doğrulamalı güncelleme yöneticisi eklendi.
-- 🛡️ **Inno Setup & Portable Desteği:** Kurulu sürümler için sessiz güncelleme (`/SP- /SILENT /NORESTART`), taşınabilir sürümler için bağımsız helper süreci geliştirildi.
-- 🧪 **44/44 Kapsamlı Test Süiti:** Güncelleme manifesti, tahrifat engelleme, downgrade koruması ve hız sınırları için otomatik testler eklendi.
+Bu proje [GPL-3.0](LICENSE) lisansı ile dağıtılmaktadır. Projede kullanılan üçüncü taraf bileşenler:
 
-### v2.0.3
-- ⚡ **Canlı İlerleme ve EMA Hız Göstergesi:** Gerçek zamanlı bayt transferine dayalı kademeli yüzde artışı eklendi.
-- 📦 **İndirme Öncesi Boyut Tahmini:** Video çözünürlüğüne göre yaklaşık dosya boyutu gösterimi sağlandı.
-
-### v2.0.2
-- 🎬 **H.264/AAC Profili:** Windows Media Player siyah ekran hatası giderildi.
-- 🔍 **ffprobe Akış Doğrulaması:** Dosya bütünlüğü teyit mekanizması eklendi.
-
----
-
-## 📜 Lisans ve Üçüncü Taraf Bildirimleri
-
-- **yt-dlp:** [The Unlicense](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE) (Kamu Malı / Public Domain)
-- **FFmpeg / ffprobe:** [GPL v3.0](https://www.gnu.org/licenses/gpl-3.0.html)
-- **Avalonia UI:** [MIT License](https://github.com/AvaloniaUI/Avalonia/blob/master/licence.md)
-- **AngleSharp:** [MIT License](https://github.com/AngleSharp/AngleSharp/blob/devel/LICENSE)
-- **YoutubeExplode:** [LGPL v3.0 License](https://github.com/Tyrrrz/YoutubeExplode/blob/master/License.txt)
-- **System.Text.Json / CommunityToolkit:** [MIT License](https://github.com/dotnet/runtime/blob/main/LICENSE.TXT)
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) — The Unlicense
+- [FFmpeg](https://ffmpeg.org/) — GPL v3.0 / LGPL v2.1
+- [Avalonia UI](https://github.com/AvaloniaUI/Avalonia) — MIT License
+- [YoutubeExplode](https://github.com/Tyrrrz/YoutubeExplode) — LGPL v3.0
+- [AngleSharp](https://github.com/AngleSharp/AngleSharp) — MIT License
